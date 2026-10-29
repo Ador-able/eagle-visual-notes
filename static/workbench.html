@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN" data-dark="true">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file: eagleplugin:; script-src 'self' 'unsafe-eval' file: eagleplugin:; style-src 'self' 'unsafe-inline' file: eagleplugin:; img-src 'self' data: blob: file: eagleplugin: https: http:; connect-src 'none'">
+  <title>视觉笔记</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="workbench">
+  <header class="window-bar">
+    <span id="window-title">视觉笔记</span>
+    <div class="window-controls">
+      <button id="window-minimize" aria-label="最小化" title="最小化"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 6h10"/></svg></button>
+      <button id="window-maximize" aria-label="最大化" title="最大化"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path id="maximize-icon" d="M1.5 1.5h9v9h-9z"/></svg></button>
+      <button id="window-close" aria-label="关闭工作台" title="关闭工作台"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="m1.5 1.5 9 9m0-9-9 9"/></svg></button>
+    </div>
+  </header>
+  <div id="error" class="error-banner" role="alert" hidden><span id="error-text"></span><button id="retry">重试保存</button></div>
+  <div id="notice" class="notice" role="status" hidden></div>
+  <main id="workspace" class="workspace">
+    <section class="image-pane" aria-label="图片预览">
+      <div class="pane-toolbar"><div class="button-group"><button id="previous" title="当前文件夹，名称顺序 · Alt+←" aria-label="上一张图片">←</button><button id="next" title="当前文件夹，名称顺序 · Alt+→" aria-label="下一张图片">→</button></div><span id="image-meta" class="muted"></span><div class="spacer"></div><button id="fit" title="重置缩放和平移">适应</button><button id="actual" title="预览图的原始像素比例">1:1</button><span id="zoom" class="zoom-label"></span></div>
+      <div id="image-stage" class="image-stage"><img id="image" hidden draggable="false" alt=""><p id="image-message" class="image-message">在 Eagle 中选择一张图片</p></div>
+    </section>
+    <div id="divider" class="divider" role="separator" tabindex="0" aria-label="调整图片与笔记比例" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="52"></div>
+    <section class="note-pane" aria-label="分析笔记">
+      <div class="pane-toolbar note-toolbar" aria-label="笔记工具栏">
+        <select id="font-size" aria-label="字号" title="字号"><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17" selected>17</option><option value="18">18</option><option value="20">20</option><option value="22">22</option><option value="24">24</option><option value="28">28</option></select>
+        <label class="line-control" title="行距"><svg width="17" height="17" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4h10M8 10h10M8 16h10M3 4v12M1 6l2-2 2 2M1 14l2 2 2-2"/></svg><select id="line-height" aria-label="行距"><option value="1.4">1.4</option><option value="1.6">1.6</option><option value="1.8" selected>1.8</option><option value="2">2.0</option><option value="2.2">2.2</option><option value="2.4">2.4</option></select></label>
+        <div class="spacer"></div>
+        <div class="mode-switch"><button id="read-mode" aria-pressed="true">阅读</button><button id="edit-mode" aria-pressed="false">编辑</button></div>
+        <details id="more-menu" class="more-menu"><summary aria-label="更多操作" title="更多操作">⋯</summary><div class="menu-popover"><button id="export-note">导出 Markdown</button><button id="backup">备份本库注释</button><button id="restore">从备份补充注释</button><hr><button id="fullscreen">全屏 <kbd>F11</kbd></button></div></details>
+      </div>
+      <div id="format-toolbar" class="format-toolbar" aria-label="Markdown 格式" hidden>
+        <select id="heading" aria-label="段落格式" title="标题：Ctrl+Alt+1～6 · 正文：Ctrl+Alt+0"><option value="">正文</option><option value="# ">标题 1</option><option value="## ">标题 2</option><option value="### ">标题 3</option></select>
+        <span class="toolbar-separator"></span>
+        <button id="format-bold" aria-label="加粗" title="加粗 · Ctrl+B"><strong>B</strong></button>
+        <button id="format-italic" aria-label="斜体" title="斜体 · Ctrl+I"><em>I</em></button>
+        <button id="format-strike" aria-label="删除线" title="删除线 · Ctrl+Shift+X"><s>S</s></button>
+        <button id="format-list" aria-label="列表" title="列表 · Ctrl+Shift+8"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M7 5h11M7 10h11M7 15h11M2 5h1M2 10h1M2 15h1"/></svg></button>
+        <button id="format-quote" aria-label="引用" title="引用 · Ctrl+Shift+."><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5H2v6h5v-6M7 11c0 3-2 4-4 4M15 5h-3v6h5v-6M17 11c0 3-2 4-4 4"/></svg></button>
+        <button id="format-code" aria-label="代码" title="行内代码 · Ctrl+`">&lt;&gt;</button>
+        <button id="format-link" aria-label="链接" title="链接 · Ctrl+K"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="m8 6 2-2a4 4 0 0 1 6 6l-2 2M12 14l-2 2a4 4 0 0 1-6-6l2-2m1 5 6-6"/></svg></button>
+      </div>
+      <div id="note-empty" class="note-empty"><svg width="42" height="42" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h6"/></svg><p>选择图片，开始观察</p></div>
+      <article id="reading" class="markdown reading" hidden></article>
+      <div id="editor" class="editor" hidden></div>
+      <footer class="note-footer"><span id="word-count"></span><span id="save-state" class="save-state" role="status"></span><span id="navigation-scope"></span></footer>
+    </section>
+  </main>
+  <script src="workbench.js"></script>
+</body>
+</html>

@@ -1,0 +1,245 @@
+import { _electron as electron } from 'playwright';
+import { createRequire } from 'node:module';
+import { mkdir, mkdtemp, readFile, writeFile, copyFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+
+const require = createRequire(import.meta.url);
+const root = await mkdtemp(path.join(tmpdir(), 'eagle-visual-notes-'));
+const libraryA = path.join(root, '验收 A.library');
+const libraryB = path.join(root, '验收 B.library');
+await mkdir(libraryA); await mkdir(libraryB);
+await copyFile('scripts/fixtures/composition.svg', path.join(root, '构图 示例.svg'));
+const original = '# 光与形的秩序\n\n## 视觉重心\n\n暖色圆形与左侧深色斜线形成对照，视线沿着斜向结构进入画面。\n\n- **主次**：暖色形体承担焦点。\n- **空间**：竖向边界将画面分为疏密不同的两个区域。\n\n> 先看整体关系，再观察局部细节。\n\n## 色彩关系\n\n灰绿、暖赭与米白共同形成克制的配色。\n\n[参考链接](https://example.com/)\n';
+const makeItem = (id, name, annotation = original) => ({ id, name, annotation, ext: 'svg', filePath: path.join(root, '构图 示例.svg'), thumbnailPath: path.join(root, '构图 示例.svg'), width: 1400, height: 1000, folders: ['F1'], tags: ['保留标签'], isDeleted: false });
+const initial = { library: libraryA, selected: ['A'], folders: ['F1'], theme: 'DARK', libraries: { [libraryA]: { A: makeItem('A', '01 · 光与形'), B: makeItem('B', '02 · 色彩关系', '第二张原生注释'), C: makeItem('C', '03 · 留白', '') }, [libraryB]: { A: makeItem('A', '另一素材库同 ID', '另一素材库的内容') } } };
+await writeFile(path.join(root, 'state.json'), JSON.stringify(initial));
+const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
+const app = await electron.launch({ executablePath: require('electron'), args: ['scripts/fixtures/main.cjs', root], env, timeout: 20000 });
+const results = [];
+const errors = [];
+const control = async (method, ...args) => app.evaluate((_, [method, args]) => global.fixture[method](...args), [method, args]);
+const state = async () => JSON.parse(await readFile(path.join(root, 'state.json'), 'utf8'));
+const until = async (fn, label) => {
+  const end = Date.now() + 10000;
+  while (Date.now() < end) { if (await fn()) return; await new Promise(resolve => setTimeout(resolve, 80)); }
+  throw new Error(`等待失败：${label}`);
+};
+const pass = message => { results.push(message); console.log(`通过：${message}`); };
+try {
+  await until(async () => app.windows().length === 2, '两个页面');
+  const page = app.windows().find(p => p.url().includes('workbench'));
+  const inspector = app.windows().find(p => p.url().includes('inspector'));
+  for (const p of [page, inspector]) p.on('pageerror', error => errors.push(error.message));
+  await page.waitForSelector('#reading h1');
+  assert.match(await page.locator('#reading').innerText(), /光与形的秩序/);
+  await until(async () => (await inspector.locator('#preview').innerText()).includes('光与形的秩序'), 'Inspector 原生注释');
+  assert.equal(await page.locator('.topbar').count(), 0);
+  assert.equal(await page.locator('#settings').count(), 0);
+  pass('构建产物启动，工作台与 Inspector 读取同一原生注释，无顶部设置栏');
+
+  await page.locator('#more-menu summary').click();
+  assert(await page.locator('#more-menu').evaluate(element => element.open));
+  await page.locator('#reading h1').click();
+  assert.equal(await page.locator('#more-menu').evaluate(element => element.open), false);
+  await page.locator('#more-menu summary').click();
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#more-menu').evaluate(element => element.open), false);
+  pass('更多菜单点击外部或按 Esc 后关闭');
+
+  await page.locator('#edit-mode').click();
+  const content = page.locator('.cm-content');
+  const replace = async text => { await content.click(); await page.keyboard.press('Control+a'); await page.keyboard.insertText(text); };
+  await replace('视觉重心');
+  await page.keyboard.press('Control+a');
+  await page.keyboard.press('Control+b');
+  assert.equal(await content.innerText(), '**视觉重心**');
+  await page.keyboard.press('Control+i');
+  assert.equal(await content.innerText(), '***视觉重心***');
+  await page.keyboard.press('Control+i');
+  assert.equal(await content.innerText(), '**视觉重心**');
+  await page.keyboard.press('Control+b');
+  assert.equal(await content.innerText(), '视觉重心');
+  for (const [key, expected] of [['Control+Shift+x', '~~视觉重心~~'], ['Control+`', '`视觉重心`']]) {
+    await page.keyboard.press(key);
+    assert.equal(await content.innerText(), expected);
+    await page.keyboard.press(key);
+    assert.equal(await content.innerText(), '视觉重心');
+  }
+  await page.keyboard.press('Control+k');
+  await page.keyboard.insertText('https://example.com/');
+  assert.equal(await content.innerText(), '[视觉重心](https://example.com/)');
+  await replace('第一段\n第二段');
+  await page.keyboard.press('Control+a');
+  await page.keyboard.press('Control+Shift+8');
+  assert.equal(await content.innerText(), '- 第一段\n- 第二段');
+  await page.keyboard.press('Control+Shift+7');
+  assert.equal(await content.innerText(), '1. 第一段\n2. 第二段');
+  await page.keyboard.press('Control+Shift+.');
+  assert.equal(await content.innerText(), '> 第一段\n> 第二段');
+  await page.keyboard.press('Control+Alt+2');
+  assert.equal(await content.innerText(), '## 第一段\n## 第二段');
+  await page.keyboard.press('Control+Alt+0');
+  assert.equal(await content.innerText(), '第一段\n第二段');
+  pass('常用 Markdown 快捷键生成正确文本，加粗和斜体可重复切换，链接可直接填写网址');
+  await replace('# 中文编辑\n\n**自动保存**与原生注释共享数据。');
+  await until(async () => (await state()).libraries[libraryA].A.annotation.includes('中文编辑'), '原生注释写入');
+  assert.deepEqual((await state()).libraries[libraryA].A.tags, ['保留标签']);
+  await until(async () => (await inspector.locator('#preview').innerText()).includes('中文编辑'), 'Inspector 更新');
+  pass('编辑自动保存到原生注释，标签保持原样，Inspector 随后更新');
+
+  await replace('# 切图前最后一次输入');
+  await control('select', ['B']);
+  await until(async () => (await content.innerText()).includes('第二张原生注释'), '选图同步');
+  assert.equal((await state()).libraries[libraryA].A.annotation, '# 切图前最后一次输入');
+  await page.keyboard.press('Control+z');
+  assert.equal(await content.innerText(), '第二张原生注释');
+  pass('输入后立即切图不丢字，每张图片编辑历史独立');
+
+  await control('annotation', 'B', '原生窗口更新内容');
+  await until(async () => (await content.innerText()).includes('原生窗口更新内容'), '反向同步');
+  pass('原生窗口修改注释后，工作台读取最新内容');
+
+  await control('failure', '磁盘不可写');
+  await replace('保存失败时仍显示待保存内容');
+  await page.locator('#error:not([hidden])').waitFor();
+  await control('select', ['A']);
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  assert.equal(await content.innerText(), '保存失败时仍显示待保存内容');
+  assert.equal((await state()).libraries[libraryA].B.annotation, '原生窗口更新内容');
+  assert.deepEqual(await page.evaluate(() => Object.keys(localStorage)), ['visual-notes-settings']);
+  pass('保存失败时保留窗口内容、显示错误并暂停切图，不另存笔记数据');
+
+  await control('failure', '');
+  await page.locator('#retry').click();
+  await until(async () => (await state()).libraries[libraryA].B.annotation === '保存失败时仍显示待保存内容', '重试保存');
+  await until(async () => (await content.innerText()).includes('切图前最后一次输入'), '恢复同步');
+  pass('重试成功后继续同步所选图片');
+
+  await replace('重新打开后直接读取原生注释');
+  await until(async () => (await state()).libraries[libraryA].A.annotation === '重新打开后直接读取原生注释', '原生持久化');
+  await control('reload');
+  await page.waitForLoadState('domcontentloaded');
+  await until(async () => (await page.locator('.cm-content').innerText()).includes('重新打开后直接读取原生注释'), '读取原生持久化');
+  pass('重新载入页面后直接读取已经保存的原生注释');
+
+  await control('failure', '暂时无法写入');
+  await replace('属于素材库 A 的内容');
+  await page.locator('#error:not([hidden])').waitFor();
+  await control('library', libraryB, ['A']);
+  await control('failure', '');
+  await page.locator('#retry').click();
+  await until(async () => (await page.locator('#error-text').innerText()).includes('素材库已切换'), '跨库保护');
+  assert.equal((await state()).libraries[libraryB].A.annotation, '另一素材库的内容');
+  await control('library', libraryA, ['A']);
+  await page.locator('#retry').click();
+  await until(async () => (await state()).libraries[libraryA].A.annotation === '属于素材库 A 的内容', '返回原库保存');
+  pass('素材库切换不会将尚未保存的内容写入另一个库的同 ID 素材');
+
+  await control('failure', '暂停写入');
+  await replace('工作台最后保存的内容');
+  await page.locator('#error:not([hidden])').waitFor();
+  await control('annotation', 'A', '原生窗口先保存的内容');
+  await control('failure', '');
+  await page.locator('#retry').click();
+  await until(async () => (await state()).libraries[libraryA].A.annotation === '工作台最后保存的内容', '最后保存生效');
+  const rescued = path.join(root, '注释.md');
+  await control('dialog', { canceled: false, filePath: rescued });
+  await page.locator('#more-menu summary').click(); await page.locator('#export-note').click();
+  await until(async () => { try { return (await readFile(rescued, 'utf8')) === '工作台最后保存的内容'; } catch { return false; } }, 'Markdown 导出');
+  pass('多个窗口以最后保存的原生内容为准，Markdown 导出内容一致');
+
+  await control('select', []);
+  await until(async () => !(await page.locator('#note-empty').isHidden()), '空选择');
+  await control('select', ['A', 'B']);
+  await until(async () => (await page.locator('#note-empty').innerText()).includes('2 个素材'), '多选状态');
+  pass('未选择和多选时展示状态，不编辑任意一张图片');
+
+  await control('annotation', 'A', original);
+  await control('select', ['A']);
+  await page.locator('#read-mode').click();
+  await until(async () => (await page.locator('#reading').innerText()).includes('光与形'), '还原展示');
+  const layoutBeforeNotice = await page.locator('#workspace').boundingBox();
+  const readingBeforeNotice = await page.locator('#reading').boundingBox();
+  await page.locator('#previous').click();
+  await page.locator('#notice:not([hidden])').waitFor();
+  assert.equal(await page.locator('#notice').innerText(), '已是第一张图片');
+  assert.deepEqual(await page.locator('#workspace').boundingBox(), layoutBeforeNotice);
+  assert.deepEqual(await page.locator('#reading').boundingBox(), readingBeforeNotice);
+  await page.locator('#notice').waitFor({ state: 'hidden', timeout: 5000 });
+  await control('select', ['C']);
+  await until(async () => (await page.title()).includes('留白'), '末张图片');
+  const layoutAtLast = await page.locator('#workspace').boundingBox();
+  await page.locator('#next').click();
+  await page.locator('#notice:not([hidden])').waitFor();
+  assert.equal(await page.locator('#notice').innerText(), '已是最后一张图片');
+  assert.deepEqual(await page.locator('#workspace').boundingBox(), layoutAtLast);
+  await control('select', ['A']);
+  await until(async () => (await page.locator('#reading').innerText()).includes('光与形'), '恢复首张');
+  pass('首末张提示使用浮层并自动消失，提示出现时双栏尺寸保持不变');
+  await page.locator('#font-size').selectOption('20');
+  await page.locator('#line-height').selectOption('2');
+  const divider = page.locator('#divider');
+  await divider.focus(); await page.keyboard.press('ArrowLeft');
+  const savedSettings = JSON.parse(await page.evaluate(() => localStorage.getItem('visual-notes-settings')));
+  await control('reload');
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForSelector('#reading h1');
+  assert.equal(await page.locator('#font-size').inputValue(), '20');
+  assert.equal(await page.locator('#line-height').inputValue(), '2');
+  assert.equal(await divider.getAttribute('aria-valuenow'), String(savedSettings.split));
+  pass('字号、行距和分栏比例重新打开后恢复');
+
+  const before = await page.locator('#reading').boundingBox();
+  const beforeZoom = await page.locator('#image').getAttribute('style');
+  const stage = await page.locator('#image-stage').boundingBox();
+  await page.mouse.move(stage.x + stage.width / 2, stage.y + stage.height / 2);
+  await page.mouse.wheel(0, -450);
+  await until(async () => (await page.locator('#image').getAttribute('style')) !== beforeZoom, '滚轮缩放');
+  const zoom = await page.locator('#zoom').innerText();
+  assert.notEqual(zoom, '');
+  await page.mouse.down(); await page.mouse.move(stage.x + stage.width / 2 + 70, stage.y + stage.height / 2 + 40); await page.mouse.up();
+  const after = await page.locator('#reading').boundingBox();
+  // Windows 的分数 DPI 会在恢复窗口后对齐到设备像素。
+  for (const key of ['x', 'y', 'width', 'height']) assert(Math.abs(after[key] - before[key]) <= 1, `笔记区域 ${key} 发生变化：${JSON.stringify({ before, after })}`);
+  await page.locator('#fit').click();
+  pass('图片滚轮缩放和平移不影响笔记布局，适应按钮可重置');
+
+  const backup = path.join(root, '备份.json');
+  await control('dialog', { canceled: false, filePath: backup });
+  await page.locator('#more-menu summary').click(); await page.locator('#backup').click();
+  await until(async () => { try { return JSON.parse(await readFile(backup, 'utf8')).notes.A.annotation === original; } catch { return false; } }, '备份文件');
+  await control('annotation', 'B', '');
+  await control('dialog', { canceled: false, filePaths: [backup] });
+  await page.locator('#more-menu summary').click(); await page.locator('#restore').click();
+  await until(async () => (await state()).libraries[libraryA].B.annotation === '保存失败时仍显示待保存内容', '恢复空注释');
+  assert.equal((await state()).libraries[libraryA].A.annotation, original);
+  pass('备份包含原生注释，恢复只填充空注释并保留已有内容');
+
+  await control('annotation', 'A', '<img src=x onerror="require(\'fs\').writeFileSync(\'bad\',\'bad\')">\n\n[危险链接](javascript:alert(1))');
+  await until(async () => (await page.locator('#reading').innerText()).includes('<img'), 'HTML 转义');
+  assert.equal(await page.locator('#reading img').count(), 0);
+  assert.equal(await page.locator('#reading a').count(), 0);
+  pass('原生注释中的 HTML 和脚本链接不会在插件中执行');
+
+  await control('annotation', 'A', original);
+  await page.locator('#font-size').selectOption('17');
+  await page.locator('#line-height').selectOption('1.8');
+  await until(async () => (await page.locator('#reading').innerText()).includes('光与形'), '展示恢复');
+  await page.locator('#notice').waitFor({ state: 'hidden', timeout: 5000 });
+  await mkdir('artifacts/verification', { recursive: true });
+  await control('capture', path.resolve('artifacts/verification/workbench-dark.png'));
+  await control('theme', 'LIGHT');
+  await control('capture', path.resolve('artifacts/verification/workbench-light.png'));
+  await control('bounds', { width: 760, height: 500 });
+  await new Promise(resolve => setTimeout(resolve, 250));
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await control('capture', path.resolve('artifacts/verification/workbench-small.png'));
+  await control('theme', 'DARK');
+  await control('capture', path.resolve('artifacts/verification/inspector.png'), 'inspector');
+  assert.deepEqual(errors, []);
+  pass('深浅主题、最小窗口布局无横向溢出，未发生页面脚本异常');
+  await writeFile('artifacts/verification/results.json', JSON.stringify({ runtime: await app.evaluate(() => process.versions), passed: results, fixtureRoot: root, errors }, null, 2));
+  console.log(`验收夹具：${root}`);
+} finally { await app.close(); }

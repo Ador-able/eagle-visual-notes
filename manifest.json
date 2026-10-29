@@ -1,0 +1,32 @@
+{
+  "id": "eagle-visual-notes",
+  "version": "1.0.0",
+  "platform": "all",
+  "arch": "all",
+  "name": "视觉笔记",
+  "logo": "/logo.png",
+  "keywords": ["Markdown", "笔记", "视觉分析", "图片分析"],
+  "devTools": false,
+  "main": {
+    "url": "workbench.html",
+    "serviceMode": true,
+    "width": 1280,
+    "height": 820,
+    "minWidth": 760,
+    "minHeight": 480,
+    "resizable": true,
+    "maximizable": true,
+    "fullscreenable": true,
+    "frame": false,
+    "multiple": false
+  },
+  "preview": {
+    "jpg,jpeg,png,webp,gif,bmp,avif,svg,tif,tiff,heic,heif,psd,ai,eps,raw,cr2,cr3,nef,arw,dng,raf,orf,rw2,jxl": {
+      "inspector": {
+        "path": "inspector.html",
+        "height": 120,
+        "multiSelect": true
+      }
+    }
+  }
+}

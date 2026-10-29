@@ -1,0 +1,34 @@
+{
+  "name": "eagle-visual-notes",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Eagle 图片与 Markdown 分析笔记双栏工作台",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "tsc --noEmit",
+    "package": "npm run check && npm run build && node scripts/package.mjs",
+    "verify": "node scripts/verify.mjs"
+  },
+  "dependencies": {
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/lang-markdown": "6.5.2",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/search": "6.7.2",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.15",
+    "@panzoom/panzoom": "4.6.2",
+    "markdown-it": "15.0.3",
+    "write-file-atomic": "5.0.1"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "14.2.0",
+    "@types/node": "22.20.5",
+    "@types/write-file-atomic": "4.0.3",
+    "electron": "22.3.27",
+    "esbuild": "0.28.2",
+    "fflate": "0.8.3",
+    "playwright": "1.64.1",
+    "typescript": "7.0.2"
+  }
+}

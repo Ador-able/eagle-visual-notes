@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="zh-CN" data-dark="true">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file: eagleplugin:; script-src 'self' 'unsafe-eval' file: eagleplugin:; style-src 'self' 'unsafe-inline' file: eagleplugin:; img-src 'self' data: file: eagleplugin: https: http:; connect-src 'none'">
+  <title>视觉笔记</title><link rel="stylesheet" href="style.css">
+</head>
+<body class="inspector">
+  <header><button id="expand" title="在独立窗口中对照阅读与编辑">展开 <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3H3v10h10v-2M8 3h5v5M8 8l5-5"/></svg></button></header>
+  <article id="preview" class="markdown"></article>
+  <p id="inspector-status" role="status" hidden></p>
+  <script src="inspector.js"></script>
+</body>
+</html>
