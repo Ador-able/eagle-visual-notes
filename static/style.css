@@ -109,7 +109,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round
 .line-control select { width: 49px; }
 .mode-switch { display: flex; padding: 2px; border-radius: 7px; background: var(--line); }
 .mode-switch, .line-control { flex-shrink: 0; }
-.mode-switch button { min-height: 27px; padding: 3px 11px; color: var(--muted); }
+.mode-switch button { width: 32px; min-height: 28px; padding: 4px; display: grid; place-items: center; color: var(--muted); }
 .mode-switch button[aria-pressed="true"] { background: var(--hover); color: var(--text); }
 .more-menu summary { display: grid; place-items: center; width: 28px; font-size: 20px; list-style: none; }
 .more-menu summary::-webkit-details-marker { display: none; }
@@ -196,6 +196,5 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round
   .pane-toolbar .muted { display: none; }
   .reading, .rich-editor .ProseMirror { padding: 24px; }
   .cm-content { padding: 24px 20px 50px !important; }
-  .mode-switch button { padding: 3px 8px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

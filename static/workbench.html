@@ -27,7 +27,11 @@
     <div id="divider" class="divider" role="separator" tabindex="0" aria-label="调整图片与笔记比例" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="52"></div>
     <section class="note-pane" aria-label="分析笔记">
       <div class="pane-toolbar note-toolbar" aria-label="笔记工具栏">
-        <div class="mode-switch" role="group" aria-label="笔记模式"><button id="read-mode" aria-pressed="true">只读</button><button id="rich-mode" aria-pressed="false">渲染编辑</button><button id="source-mode" aria-pressed="false">源码编辑</button></div>
+        <div class="mode-switch" role="group" aria-label="笔记模式">
+          <button id="read-mode" aria-pressed="true" aria-label="只读" title="只读"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2.3"/></svg></button>
+          <button id="rich-mode" aria-pressed="false" aria-label="渲染编辑" title="渲染编辑"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="m13 3 4 4M4 12l9-9a1.5 1.5 0 0 1 2 0l2 2a1.5 1.5 0 0 1 0 2l-9 9-5 1 1-5Z"/></svg></button>
+          <button id="source-mode" aria-pressed="false" aria-label="源码编辑" title="源码编辑"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 6-4 4 4 4m10-8 4 4-4 4M12 3l-4 14"/></svg></button>
+        </div>
         <div class="spacer"></div>
         <select id="font-size" aria-label="字号" title="字号"><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17" selected>17</option><option value="18">18</option><option value="20">20</option><option value="22">22</option><option value="24">24</option><option value="28">28</option></select>
         <label class="line-control" title="行距"><svg width="17" height="17" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4h10M8 10h10M8 16h10M3 4v12M1 6l2-2 2 2M1 14l2 2 2-2"/></svg><select id="line-height" aria-label="行距"><option value="1.4">1.4</option><option value="1.6">1.6</option><option value="1.8" selected>1.8</option><option value="2">2.0</option><option value="2.2">2.2</option><option value="2.4">2.4</option></select></label>
