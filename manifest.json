@@ -1,10 +1,10 @@
 {
   "id": "eagle-visual-notes",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "platform": "all",
   "arch": "all",
   "name": "视觉笔记",
-  "logo": "/logo.png",
+  "logo": "/icon.png",
   "keywords": ["Markdown", "笔记", "视觉分析", "图片分析"],
   "devTools": false,
   "shortcut": "CmdOrCtrl+Alt+M",
