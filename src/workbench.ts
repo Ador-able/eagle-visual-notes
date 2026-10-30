@@ -11,6 +11,7 @@ import {
   writeText,
 } from "./shared";
 import { NoteEditor } from "./editor";
+import { RichNoteEditor } from "./rich-editor";
 import { ImageView } from "./image-view";
 import {
   backupLibrary,
@@ -20,11 +21,12 @@ import {
   type NoteDocument,
 } from "./storage";
 
+type NoteMode = "read" | "rich" | "source";
 interface Settings {
   fontSize: number;
   lineHeight: number;
   split: number;
-  editing: boolean;
+  mode: NoteMode;
   bounds?: Bounds;
   maximized?: boolean;
   fullscreen?: boolean;
@@ -33,7 +35,7 @@ const defaults: Settings = {
   fontSize: 17,
   lineHeight: 1.8,
   split: 52,
-  editing: false,
+  mode: "read",
 };
 let settings: Settings = { ...defaults };
 let current: NoteDocument | null = null;
@@ -52,7 +54,7 @@ let restoredWindow = false;
 let lastGeometry = 0;
 let disposed = false;
 let editVersion = 0;
-const editor = new NoteEditor($("editor"), (text) => {
+function noteChanged(text: string) {
   if (!current || switching) return;
   current.text = text;
   $("word-count").textContent =
@@ -60,7 +62,20 @@ const editor = new NoteEditor($("editor"), (text) => {
   editVersion++;
   $("save-state").textContent = "正在保存…";
   void flush().catch(showError);
-});
+}
+const editor = new NoteEditor($("editor"), noteChanged);
+const richEditor = new RichNoteEditor($("rich-editor"), noteChanged);
+function setEditable(value: boolean) {
+  editor.setEditable(value);
+  richEditor.setEditable(value);
+}
+function focusEditor() {
+  if (settings.mode === "rich") richEditor.view.focus();
+  if (settings.mode === "source") editor.view.focus();
+}
+function editorHasFocus() {
+  return editor.view.hasFocus || richEditor.hasFocus;
+}
 const imageView = new ImageView(
   $("image-stage"),
   $("image"),
@@ -99,14 +114,16 @@ function applySettings() {
 }
 function updateMode() {
   $("note-empty").hidden = !!current;
-  $("reading").hidden = !current || settings.editing;
-  $("editor").hidden = !current || !settings.editing;
-  $("format-toolbar").hidden = !current || !settings.editing;
-  $("read-mode").setAttribute("aria-pressed", String(!settings.editing));
-  $("edit-mode").setAttribute("aria-pressed", String(settings.editing));
-  $<HTMLButtonElement>("edit-mode").disabled = !current;
-  if (current && !settings.editing) renderMarkdown($("reading"), current.text);
-  if (current && settings.editing) editor.view.requestMeasure();
+  $("reading").hidden = !current || settings.mode !== "read";
+  $("rich-editor").hidden = !current || settings.mode !== "rich";
+  $("editor").hidden = !current || settings.mode !== "source";
+  $("format-toolbar").hidden = !current || settings.mode === "read";
+  for (const mode of ["read", "rich", "source"] as const) {
+    $(`${mode}-mode`).setAttribute("aria-pressed", String(settings.mode === mode));
+    $<HTMLButtonElement>(`${mode}-mode`).disabled = !current;
+  }
+  if (current && settings.mode === "read") renderMarkdown($("reading"), current.text);
+  if (current && settings.mode === "source") editor.view.requestMeasure();
 }
 function present(
   doc: NoteDocument | null,
@@ -115,6 +132,7 @@ function present(
 ) {
   current = doc;
   editor.setText(doc?.text || "");
+  richEditor.setText(doc?.text || "", true);
   document.title = doc ? `${doc.item.name} — 视觉笔记` : "视觉笔记";
   $("window-title").textContent = doc?.item.name || "视觉笔记";
   $("image-meta").textContent = doc
@@ -189,15 +207,16 @@ async function syncSelection() {
         current.text = annotation;
         current.item = item!;
         editor.setText(annotation);
+        richEditor.setText(annotation, true);
         updateMode();
         $("word-count").textContent =
           `${annotation.replace(/\s/g, "").length.toLocaleString()} 字符`;
       }
       return;
     }
-    const hadEditorFocus = editor.view.hasFocus;
+    const hadEditorFocus = editorHasFocus();
     switching = true;
-    editor.setEditable(false);
+    setEditable(false);
     try {
       await flush();
       const doc = item ? loadNote(library, item) : null;
@@ -220,8 +239,8 @@ async function syncSelection() {
       clearError();
     } finally {
       switching = false;
-      editor.setEditable(true);
-      if (hadEditorFocus && settings.editing) editor.view.focus();
+      setEditable(true);
+      if (hadEditorFocus) focusEditor();
     }
   })().finally(() => {
     syncPromise = null;
@@ -313,13 +332,13 @@ async function action(operation: () => Promise<void>) {
   actionBusy = true;
   try {
     await syncPromise;
-    editor.setEditable(false);
+    setEditable(false);
     await operation();
   } catch (error) {
     showError(error);
   } finally {
     actionBusy = false;
-    editor.setEditable(true);
+    setEditable(true);
   }
 }
 function onAction(id: string, operation: () => Promise<void>) {
@@ -438,19 +457,20 @@ onAction("restore", async () => {
 });
 $("fit").onclick = () => imageView.fit();
 $("actual").onclick = () => imageView.actual();
-for (const [id, editing] of [
-  ["read-mode", false],
-  ["edit-mode", true],
-] as const) {
-  $(id).onclick = () => {
-    settings.editing = editing;
+for (const mode of ["read", "rich", "source"] as const) {
+  $(`${mode}-mode`).onclick = () => {
+    if (!current || switching || actionBusy) return;
     try {
+      if (mode === "rich") richEditor.setText(current.text);
+      if (mode === "source" && editor.view.state.doc.toString() !== current.text)
+        editor.setText(current.text);
+      settings.mode = mode;
       persistSettings();
+      updateMode();
+      focusEditor();
     } catch (error) {
       showError(error);
     }
-    updateMode();
-    if (editing && current) editor.view.focus();
   };
 }
 for (const id of ["font-size", "line-height"])
@@ -473,20 +493,26 @@ for (const [id, before, after] of [
 ] as const) {
   $(id).onmousedown = (event) => event.preventDefault();
   $(id).onclick = () => {
-    if (!actionBusy && !switching) editor.wrap(before, after);
+    if (!actionBusy && !switching && settings.mode !== "read") {
+      if (settings.mode === "rich") richEditor.wrap(before);
+      else editor.wrap(before, after);
+    }
   };
 }
 $("format-link").onmousedown = (event) => event.preventDefault();
-$("format-link").onclick = () => { if (!actionBusy && !switching) editor.link(); };
+function activeEditor() { return settings.mode === "rich" ? richEditor : editor; }
+$("format-link").onclick = () => { if (!actionBusy && !switching) activeEditor().link(); };
+$("format-list").onmousedown = (event) => event.preventDefault();
 $("format-list").onclick = () => {
-  if (!actionBusy && !switching) editor.prefix("- ");
+  if (!actionBusy && !switching) activeEditor().prefix("- ");
 };
+$("format-quote").onmousedown = (event) => event.preventDefault();
 $("format-quote").onclick = () => {
-  if (!actionBusy && !switching) editor.prefix("> ");
+  if (!actionBusy && !switching) activeEditor().prefix("> ");
 };
 $("heading").addEventListener("change", () => {
   if (!actionBusy && !switching)
-    editor.prefix($<HTMLSelectElement>("heading").value);
+    activeEditor().prefix($<HTMLSelectElement>("heading").value);
   $<HTMLSelectElement>("heading").value = "";
 });
 const divider = $("divider");
@@ -539,10 +565,11 @@ window.addEventListener("resize", () => {
   void rememberWindow().catch(showError);
 });
 document.addEventListener("keydown", (event) => {
+  if ($<HTMLDialogElement>("link-dialog").open) return;
   if (
     (event.ctrlKey || event.metaKey) &&
     event.key.toLowerCase() === "z" &&
-    !editor.view.hasFocus
+    !editorHasFocus()
   )
     event.preventDefault();
   if (event.key === "F11") {
@@ -559,7 +586,7 @@ document.addEventListener("keydown", (event) => {
   }
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "e") {
     event.preventDefault();
-    $(settings.editing ? "read-mode" : "edit-mode").click();
+    $(settings.mode === "read" ? "rich-mode" : "read-mode").click();
   }
   if (event.altKey && ["ArrowLeft", "ArrowRight"].includes(event.key)) {
     event.preventDefault();
@@ -574,8 +601,10 @@ eagle.onPluginCreate(() => {
       throw new Error("视觉笔记需要 Eagle 4.0 Build 12 或更新版本。");
     const stored = localStorage.getItem("visual-notes-settings");
     if (stored) settings = { ...defaults, ...JSON.parse(stored) };
+    if (!["read", "rich", "source"].includes(settings.mode)) settings.mode = "read";
     applySettings();
     applyTheme(eagle.app.theme);
+    await richEditor.create();
     control = await controlRoot();
     lastRequest = await readText(path.join(control, "open.request"));
     ready = true;

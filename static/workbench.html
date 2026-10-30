@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' file: eagleplugin:; script-src 'self' 'unsafe-eval' file: eagleplugin:; style-src 'self' 'unsafe-inline' file: eagleplugin:; img-src 'self' data: blob: file: eagleplugin: https: http:; connect-src 'none'">
   <title>视觉笔记</title>
+  <link rel="stylesheet" href="workbench.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="workbench">
@@ -26,10 +27,10 @@
     <div id="divider" class="divider" role="separator" tabindex="0" aria-label="调整图片与笔记比例" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="52"></div>
     <section class="note-pane" aria-label="分析笔记">
       <div class="pane-toolbar note-toolbar" aria-label="笔记工具栏">
+        <div class="mode-switch" role="group" aria-label="笔记模式"><button id="read-mode" aria-pressed="true">只读</button><button id="rich-mode" aria-pressed="false">渲染编辑</button><button id="source-mode" aria-pressed="false">源码编辑</button></div>
+        <div class="spacer"></div>
         <select id="font-size" aria-label="字号" title="字号"><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17" selected>17</option><option value="18">18</option><option value="20">20</option><option value="22">22</option><option value="24">24</option><option value="28">28</option></select>
         <label class="line-control" title="行距"><svg width="17" height="17" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4h10M8 10h10M8 16h10M3 4v12M1 6l2-2 2 2M1 14l2 2 2-2"/></svg><select id="line-height" aria-label="行距"><option value="1.4">1.4</option><option value="1.6">1.6</option><option value="1.8" selected>1.8</option><option value="2">2.0</option><option value="2.2">2.2</option><option value="2.4">2.4</option></select></label>
-        <div class="spacer"></div>
-        <div class="mode-switch"><button id="read-mode" aria-pressed="true">阅读</button><button id="edit-mode" aria-pressed="false">编辑</button></div>
         <details id="more-menu" class="more-menu"><summary aria-label="更多操作" title="更多操作">⋯</summary><div class="menu-popover"><button id="export-note">导出 Markdown</button><button id="backup">备份本库注释</button><button id="restore">从备份补充注释</button><hr><button id="fullscreen">全屏 <kbd>F11</kbd></button></div></details>
       </div>
       <div id="format-toolbar" class="format-toolbar" aria-label="Markdown 格式" hidden>
@@ -45,10 +46,18 @@
       </div>
       <div id="note-empty" class="note-empty"><svg width="42" height="42" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h6"/></svg><p>选择图片，开始观察</p></div>
       <article id="reading" class="markdown reading" hidden></article>
+      <div id="rich-editor" class="rich-editor" hidden></div>
       <div id="editor" class="editor" hidden></div>
       <footer class="note-footer"><span id="word-count"></span><span id="save-state" class="save-state" role="status"></span><span id="navigation-scope"></span></footer>
     </section>
   </main>
+  <dialog id="link-dialog" class="link-dialog">
+    <form id="link-form">
+      <label for="link-url">链接地址</label>
+      <input id="link-url" type="text" required autocomplete="off" spellcheck="false">
+      <div class="dialog-actions"><button id="link-cancel" type="button">取消</button><button type="submit">应用链接</button></div>
+    </form>
+  </dialog>
   <script src="workbench.js"></script>
 </body>
 </html>

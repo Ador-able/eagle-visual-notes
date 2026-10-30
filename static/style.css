@@ -103,11 +103,12 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round
 .divider { cursor: col-resize; position: relative; touch-action: none; border-radius: 8px; }
 .divider:after { content: ""; height: 32px; width: 3px; border-radius: 3px; background: var(--muted); position: absolute; top: 50%; left: 3px; opacity: .25; }
 .divider:hover:after, .divider:focus-visible:after { opacity: .7; }
-.note-toolbar { gap: 6px; }
+.note-toolbar { gap: 6px; height: auto; min-height: 46px; flex-wrap: wrap; }
 .note-toolbar select { font-size: 12px; padding: 4px 2px; width: 47px; }
 .line-control { display: flex; gap: 2px; align-items: center; color: var(--muted); }
 .line-control select { width: 49px; }
 .mode-switch { display: flex; padding: 2px; border-radius: 7px; background: var(--line); }
+.mode-switch, .line-control { flex-shrink: 0; }
 .mode-switch button { min-height: 27px; padding: 3px 11px; color: var(--muted); }
 .mode-switch button[aria-pressed="true"] { background: var(--hover); color: var(--text); }
 .more-menu summary { display: grid; place-items: center; width: 28px; font-size: 20px; list-style: none; }
@@ -120,8 +121,23 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round
 .format-toolbar select { font-size: 12px; padding: 3px 6px; }
 .format-toolbar button { width: 30px; padding: 3px; display: grid; place-items: center; }
 .toolbar-separator { height: 16px; width: 1px; background: var(--line); margin: 0 5px; }
-.reading, .editor { flex: 1; min-height: 0; overflow: auto; }
-.reading { padding: 28px clamp(24px, 3.5vw, 52px) 50px; }
+.reading, #editor, .rich-editor { flex: 1; min-height: 0; overflow: auto; }
+.reading, .rich-editor .ProseMirror { padding: 28px clamp(24px, 3.5vw, 52px) 50px; }
+.rich-editor .milkdown { min-height: 100%; display: flex; }
+.rich-editor .ProseMirror { width: 100%; min-height: 100%; white-space: pre-wrap; position: relative; outline: none; }
+.rich-editor .ProseMirror:focus-visible { box-shadow: inset 2px 0 var(--accent); }
+.rich-editor .ProseMirror-selectednode { outline: 2px solid var(--accent); }
+.rich-editor li[data-checked] { list-style: none; position: relative; }
+.rich-editor li[data-checked]::before { content: "☐"; position: absolute; left: -1.4em; color: var(--muted); }
+.rich-editor li[data-checked="true"]::before { content: "☑"; }
+.rich-editor li > p:last-child { margin-bottom: 0; }
+.rich-editor .selectedCell { background: var(--hover); }
+.link-dialog { width: min(420px, calc(100vw - 40px)); color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 24px; }
+.link-dialog::backdrop { background: #0005; }
+.link-dialog label { display: block; margin-bottom: 12px; }
+.link-dialog input { width: 100%; padding: 9px; border: 1px solid var(--muted); border-radius: 6px; background: var(--bg); color: var(--text); }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.dialog-actions button[type="submit"] { background: var(--accent); color: var(--bg); }
 .markdown { font-size: var(--note-size); line-height: var(--note-leading); overflow-wrap: anywhere; word-break: normal; line-break: auto; }
 .markdown > :first-child { margin-top: 0; }
 .markdown h1 { font-size: 1.7em; line-height: 1.4; margin: 1.4em 0 .8em; font-weight: 600; letter-spacing: -.02em; }
@@ -178,7 +194,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round
   .workspace { padding: 2px 7px 7px; }
   .pane-toolbar { padding: 7px 8px; gap: 3px; }
   .pane-toolbar .muted { display: none; }
-  .reading { padding: 24px; }
+  .reading, .rich-editor .ProseMirror { padding: 24px; }
   .cm-content { padding: 24px 20px 50px !important; }
   .mode-switch button { padding: 3px 8px; }
 }
