@@ -28,16 +28,16 @@ const until = async (fn, label) => {
 };
 const pass = message => { results.push(message); console.log(`通过：${message}`); };
 try {
-  await until(async () => app.windows().length === 2, '两个页面');
+  await app.evaluate(({ app }) => app.whenReady());
+  await control('run');
+  await until(async () => app.windows().some(p => p.url().includes('workbench')), '打开工作台');
   const page = app.windows().find(p => p.url().includes('workbench'));
-  const inspector = app.windows().find(p => p.url().includes('inspector'));
-  for (const p of [page, inspector]) p.on('pageerror', error => errors.push(error.message));
+  page.on('pageerror', error => errors.push(error.message));
   await page.waitForSelector('#reading h1');
   assert.match(await page.locator('#reading').innerText(), /光与形的秩序/);
-  await until(async () => (await inspector.locator('#preview').innerText()).includes('光与形的秩序'), 'Inspector 原生注释');
   assert.equal(await page.locator('.topbar').count(), 0);
   assert.equal(await page.locator('#settings').count(), 0);
-  pass('构建产物启动，工作台与 Inspector 读取同一原生注释，无顶部设置栏');
+  pass('运行插件时加载构建产物，工作台正确读取原生注释');
 
   await page.locator('#more-menu summary').click();
   assert(await page.locator('#more-menu').evaluate(element => element.open));
@@ -181,8 +181,7 @@ try {
   await replace('# 中文编辑\n\n**自动保存**与原生注释共享数据。');
   await until(async () => (await state()).libraries[libraryA].A.annotation.includes('中文编辑'), '原生注释写入');
   assert.deepEqual((await state()).libraries[libraryA].A.tags, ['保留标签']);
-  await until(async () => (await inspector.locator('#preview').innerText()).includes('中文编辑'), 'Inspector 更新');
-  pass('编辑自动保存到原生注释，标签保持原样，Inspector 随后更新');
+  pass('编辑自动保存到原生注释，标签保持原样');
 
   await replace('# 切图前最后一次输入');
   await control('select', ['B']);
@@ -204,6 +203,9 @@ try {
   assert.equal(await content.innerText(), '保存失败时仍显示待保存内容');
   assert.equal((await state()).libraries[libraryA].B.annotation, '原生窗口更新内容');
   assert.deepEqual(await page.evaluate(() => Object.keys(localStorage)), ['visual-notes-settings']);
+  await page.locator('#window-close').click();
+  assert.equal(page.isClosed(), false);
+  assert.equal(await content.innerText(), '保存失败时仍显示待保存内容');
   pass('保存失败时保留窗口内容、显示错误并暂停切图，不另存笔记数据');
 
   await control('failure', '');
@@ -345,9 +347,18 @@ try {
   assert(await page.locator('.note-toolbar').evaluate(el => el.scrollWidth <= el.clientWidth));
   await control('capture', path.resolve('artifacts/verification/workbench-small.png'));
   await control('theme', 'DARK');
-  await control('capture', path.resolve('artifacts/verification/inspector.png'), 'inspector');
   assert.deepEqual(errors, []);
   pass('深浅主题、最小窗口布局无横向溢出，未发生页面脚本异常');
+  await page.locator('#window-close').click();
+  await until(async () => page.isClosed(), '关闭窗口释放工作台');
+  await control('run');
+  await until(async () => app.windows().some(p => p.url().includes('workbench')), '关闭后重新打开');
+  const reopened = app.windows().find(p => p.url().includes('workbench'));
+  await reopened.locator('#reading h1').waitFor();
+  assert.match(await reopened.locator('#reading').innerText(), /光与形/);
+  await control('run');
+  assert.equal(app.windows().filter(p => p.url().includes('workbench')).length, 1);
+  pass('关闭后释放工作台，重新打开读取已保存注释，重复运行保持单实例');
   await writeFile('artifacts/verification/results.json', JSON.stringify({ runtime: await app.evaluate(() => process.versions), passed: results, fixtureRoot: root, errors }, null, 2));
   console.log(`验收夹具：${root}`);
 } finally { await app.close(); }

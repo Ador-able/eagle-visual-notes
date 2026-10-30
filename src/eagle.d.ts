@@ -17,7 +17,7 @@ interface Bounds {
   height: number;
 }
 declare const eagle: {
-  onPluginCreate(callback: (plugin: { path: string }) => void): void;
+  onPluginCreate(callback: () => void): void;
   onPluginRun(callback: () => void): void;
   onPluginShow(callback: () => void): void;
   onPluginHide(callback: () => void): void;
@@ -27,7 +27,6 @@ declare const eagle: {
   app: {
     build: number;
     theme: string;
-    getPath(name: string): Promise<string>;
     isDarkColors(): boolean;
   };
   library: { path: string };

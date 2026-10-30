@@ -1,11 +1,12 @@
 import { build } from 'esbuild';
 import { builtinModules } from 'node:module';
-import { mkdir, readdir, copyFile, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, copyFile, readFile, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 
+await rm('dist', { recursive: true, force: true });
 await mkdir('dist', { recursive: true });
 const result = await build({
-  entryPoints: ['src/workbench.ts', 'src/inspector.ts'],
+  entryPoints: ['src/workbench.ts'],
   outdir: 'dist', bundle: true, platform: 'browser', format: 'iife',
   target: ['chrome107'], external: builtinModules.flatMap(name => [name, `node:${name}`]),
   legalComments: 'eof', logLevel: 'info', metafile: true,

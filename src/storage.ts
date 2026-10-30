@@ -1,5 +1,6 @@
 import { promises as fs } from "fs";
-import { isImage, writeText } from "./shared";
+import { isImage } from "./shared";
+import { writeText } from "./files";
 
 export interface NoteDocument {
   library: string;

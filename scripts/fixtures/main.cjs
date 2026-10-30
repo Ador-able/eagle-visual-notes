@@ -8,7 +8,7 @@ const root = process.argv.at(-1);
 app.setPath('userData', path.join(root, 'user-data'));
 let state = JSON.parse(fs.readFileSync(path.join(root, 'state.json'), 'utf8'));
 let workbench;
-let inspector;
+const manifest = JSON.parse(fs.readFileSync(path.resolve('dist/manifest.json'), 'utf8'));
 let failure = '';
 let delay = 0;
 let reloaded;
@@ -17,7 +17,7 @@ const persist = () => writeFileAtomic.sync(path.join(root, 'state.json'), JSON.s
 const snapshot = () => ({ library: state.library, selected: state.selected, theme: state.theme });
 
 function send(event, value) {
-  for (const win of [workbench, inspector]) if (win && !win.isDestroyed()) win.webContents.send('fixture-event', event, value);
+  if (workbench && !workbench.isDestroyed()) workbench.webContents.send('fixture-event', event, value);
 }
 ipcMain.handle('fixture-call', async (event, method, args) => {
   const win = BrowserWindow.fromWebContents(event.sender);
@@ -42,7 +42,6 @@ ipcMain.handle('fixture-call', async (event, method, args) => {
   }
   if (method === 'select') { state.selected = args; persist(); send('snapshot', snapshot()); return true; }
   if (method === 'folders') return state.folders.map(id => ({ id }));
-  if (method === 'userData') return path.join(root, 'plugin-data');
   if (method === 'snapshot') return snapshot();
   if (method === 'window') {
     const [name, value] = args;
@@ -65,10 +64,14 @@ function makeWindow(file, size) {
   win.loadFile(path.resolve('dist', file));
   return win;
 }
+function openWorkbench() {
+  if (workbench && !workbench.isDestroyed()) {
+    workbench.webContents.send('fixture-event', 'run');
+    return;
+  }
+  workbench = makeWindow('workbench.html', { ...manifest.main, width: 1280, height: 850 });
+}
 app.whenReady().then(() => {
-  const { main } = JSON.parse(fs.readFileSync(path.resolve('dist/manifest.json'), 'utf8'));
-  workbench = makeWindow('workbench.html', { ...main, width: 1280, height: 850 });
-  inspector = makeWindow('inspector.html', { width: 340, height: 450 });
   global.fixture = {
     select(ids) { state.selected = ids; persist(); send('snapshot', snapshot()); },
     library(library, ids) { state.library = library; state.selected = ids; persist(); send('snapshot', snapshot()); send('library', library); },
@@ -80,10 +83,10 @@ app.whenReady().then(() => {
     // 工作台恢复窗口尺寸并显示后，才继续验收后续交互。
     reload() { return new Promise(resolve => { reloaded = resolve; workbench.reload(); }); },
     hide() { workbench.webContents.send('fixture-event', 'hide'); },
-    run() { workbench.webContents.send('fixture-event', 'run'); },
+    run: openWorkbench,
     bounds(bounds) { workbench.setBounds(bounds); },
-    async capture(file, which = 'workbench') {
-      const contents = (which === 'inspector' ? inspector : workbench).webContents;
+    async capture(file) {
+      const contents = workbench.webContents;
       contents.incrementCapturerCount({ width: 0, height: 0 }, true, true);
       try {
         // 隐藏的验收窗口需要完成绘制，再从合成器获取当前画面。
@@ -97,4 +100,5 @@ app.whenReady().then(() => {
     state() { return state; }
   };
 });
-app.on('window-all-closed', () => app.quit());
+// 工作台关闭后，验收进程仍需模拟 Eagle 接收下一次运行请求。
+app.on('window-all-closed', () => {});

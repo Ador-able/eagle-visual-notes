@@ -1,5 +1,6 @@
 import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
-import { fileURL, nativeExtensions } from "./shared";
+import { nativeExtensions } from "./shared";
+import { fileURL } from "./files";
 
 export class ImageView {
   private panzoom: PanzoomObject | null = null;

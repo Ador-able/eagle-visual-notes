@@ -1,15 +1,12 @@
-import path from "path";
 import {
   $,
   applyTheme,
   bindLinks,
-  controlRoot,
   errorMessage,
   isImage,
-  readText,
   renderMarkdown,
-  writeText,
 } from "./shared";
+import { writeText } from "./files";
 import { NoteEditor } from "./editor";
 import { RichNoteEditor } from "./rich-editor";
 import { ImageView } from "./image-view";
@@ -48,8 +45,6 @@ let ready = false;
 let actionBusy = false;
 let switching = false;
 let saveBlocked = false;
-let control = "";
-let lastRequest = "";
 let restoredWindow = false;
 let lastGeometry = 0;
 let disposed = false;
@@ -307,12 +302,6 @@ async function showWindow() {
 
 async function tick() {
   try {
-    const request = await readText(path.join(control, "open.request"));
-    if (request && request !== lastRequest) {
-      lastRequest = request;
-      await showWindow();
-      await writeText(path.join(control, "open.ack"), request);
-    }
     if (visible) {
       await syncSelection();
       if (Date.now() - lastGeometry > 2500) {
@@ -414,7 +403,7 @@ onAction("window-maximize", async () => {
 onAction("window-close", async () => {
   await flush();
   await rememberWindow();
-  await eagle.window.hide();
+  window.close();
 });
 onAction("fullscreen", async () => {
   await eagle.window.setFullScreen(!(await eagle.window.isFullScreen()));
@@ -605,10 +594,8 @@ eagle.onPluginCreate(() => {
     applySettings();
     applyTheme(eagle.app.theme);
     await richEditor.create();
-    control = await controlRoot();
-    lastRequest = await readText(path.join(control, "open.request"));
     ready = true;
-    await syncSelection();
+    await showWindow();
     void tick();
   })().catch((error) => {
     showError(error);

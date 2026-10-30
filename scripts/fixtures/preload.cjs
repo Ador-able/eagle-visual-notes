@@ -9,7 +9,7 @@ global.eagle = {
   onPluginCreate: on('create'), onPluginRun: on('run'), onPluginShow: on('show'),
   onPluginHide: on('hide'), onPluginBeforeExit: on('exit'),
   onThemeChanged: on('theme'), onLibraryChanged: on('library'),
-  app: { build: 23, theme: 'DARK', getPath: () => call('userData'), isDarkColors: () => true },
+  app: { build: 23, theme: 'DARK', isDarkColors: () => true },
   library: { path: '' },
   item: {
     getSelected: async () => (await call('selected')).map(item),
@@ -31,6 +31,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   const state = await call('snapshot');
   eagle.library.path = state.library;
   eagle.app.theme = state.theme;
-  emit('create', { path: require('node:path').resolve('dist') });
+  emit('create');
   setTimeout(() => emit('run'), 150);
 });

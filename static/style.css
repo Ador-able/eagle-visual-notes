@@ -181,15 +181,6 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round
 /* 操作提示悬浮显示，不改变图片与正文的可用空间。 */
 .notice { position: fixed; z-index: 30; bottom: 48px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 40px); color: var(--text); background: var(--toolbar); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 18px #0003; pointer-events: none; }
 
-/* Inspector 使用宿主标题，展开入口保持原生面板的视觉重量。 */
-.inspector { background: transparent; padding: 0; }
-.inspector header { display: flex; justify-content: flex-end; padding: 0 0 8px; }
-.inspector header button { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 12px; min-height: 25px; padding: 3px 7px; border-radius: 5px; }
-.inspector .markdown { font-size: 13px; line-height: 1.7; max-height: 300px; overflow: auto; padding: 0 5px 5px 0; }
-.inspector .markdown h1 { font-size: 1.3em; }
-.inspector .markdown h2 { font-size: 1.15em; }
-.inspector #inspector-status { font-size: 12px; color: var(--error); line-height: 1.5; }
-.inspector .empty-note { padding: 4px 0; }
 @media (max-width: 900px) {
   .workspace { padding: 2px 7px 7px; }
   .pane-toolbar { padding: 7px 8px; gap: 3px; }
