@@ -1,5 +1,5 @@
 import { promises as fs } from "fs";
-import { isImage } from "./shared";
+import { isMedia } from "./shared";
 import { writeText } from "./files";
 
 export interface NoteDocument {
@@ -30,7 +30,7 @@ export async function saveNote(doc: NoteDocument) {
   const item = await eagle.item.getById(doc.item.id);
   requireLibrary(doc.library);
   if (!item || item.isDeleted)
-    throw new Error("图片已不存在或已被移入回收站，无法保存注释。");
+    throw new Error("素材已不存在或已被移入回收站，无法保存注释。");
   const annotation = item.annotation || "";
   if (annotation === doc.text) {
     doc.base = annotation;
@@ -57,7 +57,7 @@ export async function backupLibrary(library: string, target: string) {
   });
   requireLibrary(library);
   const notes: Record<string, { name: string; annotation: string }> = {};
-  for (const item of items.filter(isImage)) {
+  for (const item of items.filter(isMedia)) {
     if (item.annotation)
       notes[item.id] = { name: item.name, annotation: item.annotation };
   }
@@ -91,7 +91,7 @@ export async function restoreLibrary(library: string, source: string) {
   ][];
   for (const [id, value] of entries) {
     if (!/^[\w-]+$/.test(id) || !value || typeof value.annotation !== "string")
-      throw new Error("备份包含无效的图片 ID 或注释。");
+      throw new Error("备份包含无效的素材 ID 或注释。");
   }
   let restored = 0,
     skipped = 0,

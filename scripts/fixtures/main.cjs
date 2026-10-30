@@ -57,6 +57,7 @@ ipcMain.handle('fixture-call', async (event, method, args) => {
   if (method === 'displays') return [{ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }];
   if (method === 'dialog') return dialogs.shift() || { canceled: true, filePaths: [], response: 0 };
   if (method === 'external') { state.lastExternal = args; persist(); return; }
+  if (method === 'openPath') { state.lastOpenPath = args; persist(); return; }
   throw new Error(`未知夹具调用：${method}`);
 });
 function makeWindow(file, size) {
@@ -76,6 +77,7 @@ app.whenReady().then(() => {
     select(ids) { state.selected = ids; persist(); send('snapshot', snapshot()); },
     library(library, ids) { state.library = library; state.selected = ids; persist(); send('snapshot', snapshot()); send('library', library); },
     annotation(id, text) { state.libraries[state.library][id].annotation = text; persist(); },
+    items(items) { Object.assign(state.libraries[state.library], items); persist(); },
     failure(value) { failure = value; },
     delay(value) { delay = value; },
     dialog(value) { dialogs.push(value); },

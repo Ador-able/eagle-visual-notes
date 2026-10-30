@@ -1,8 +1,8 @@
 {
   "name": "eagle-visual-notes",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "private": true,
-  "description": "Eagle 图片与 Markdown 分析笔记双栏工作台",
+  "description": "Eagle 图片、视频与 Markdown 笔记双栏工作台",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",

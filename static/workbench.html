@@ -20,11 +20,11 @@
   <div id="error" class="error-banner" role="alert" hidden><span id="error-text"></span><button id="retry">重试保存</button></div>
   <div id="notice" class="notice" role="status" hidden></div>
   <main id="workspace" class="workspace">
-    <section class="image-pane" aria-label="图片预览">
-      <div class="pane-toolbar"><div class="button-group"><button id="previous" title="当前文件夹，名称顺序 · Alt+←" aria-label="上一张图片">←</button><button id="next" title="当前文件夹，名称顺序 · Alt+→" aria-label="下一张图片">→</button></div><span id="image-meta" class="muted"></span><div class="spacer"></div><button id="fit" title="重置缩放和平移">适应</button><button id="actual" title="预览图的原始像素比例">1:1</button><span id="zoom" class="zoom-label"></span></div>
-      <div id="image-stage" class="image-stage"><img id="image" hidden draggable="false" alt=""><p id="image-message" class="image-message">在 Eagle 中选择一张图片</p></div>
+    <section class="media-pane" aria-label="素材预览">
+      <div class="pane-toolbar"><div class="button-group"><button id="previous" title="当前文件夹，名称顺序 · Alt+←" aria-label="上一个素材">←</button><button id="next" title="当前文件夹，名称顺序 · Alt+→" aria-label="下一个素材">→</button></div><span id="media-meta" class="muted"></span><div class="spacer"></div><button id="fit" title="重置缩放和平移">适应</button><button id="actual" title="预览图的原始像素比例">1:1</button><span id="zoom" class="zoom-label"></span></div>
+      <div id="media-stage" class="media-stage"><img id="image" hidden draggable="false" alt=""><div class="media-feedback"><p id="media-message" role="status">在 Eagle 中选择图片或视频</p><button id="open-media" hidden>用系统播放器打开</button></div></div>
     </section>
-    <div id="divider" class="divider" role="separator" tabindex="0" aria-label="调整图片与笔记比例" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="52"></div>
+    <div id="divider" class="divider" role="separator" tabindex="0" aria-label="调整素材与笔记比例" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="52"></div>
     <section class="note-pane" aria-label="分析笔记">
       <div class="pane-toolbar note-toolbar" aria-label="笔记工具栏">
         <div class="mode-switch" role="group" aria-label="笔记模式">
@@ -48,7 +48,7 @@
         <button id="format-code" aria-label="代码" title="行内代码 · Ctrl+`">&lt;&gt;</button>
         <button id="format-link" aria-label="链接" title="链接 · Ctrl+K"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="m8 6 2-2a4 4 0 0 1 6 6l-2 2M12 14l-2 2a4 4 0 0 1-6-6l2-2m1 5 6-6"/></svg></button>
       </div>
-      <div id="note-empty" class="note-empty"><svg width="42" height="42" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h6"/></svg><p>选择图片，开始观察</p></div>
+      <div id="note-empty" class="note-empty"><svg width="42" height="42" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h6"/></svg><p>选择图片或视频，开始观察</p></div>
       <article id="reading" class="markdown reading" hidden></article>
       <div id="rich-editor" class="rich-editor" hidden></div>
       <div id="editor" class="editor" hidden></div>

@@ -1,18 +1,20 @@
 import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
-import { nativeExtensions } from "./shared";
+import { isVideo, nativeImageExtensions } from "./shared";
 import { fileURL } from "./files";
 
-export class ImageView {
+export class MediaView {
   private panzoom: PanzoomObject | null = null;
   private fitMode = true;
   private generation = 0;
   private width = 0;
   private height = 0;
+  private video: HTMLVideoElement | null = null;
   constructor(
     private stage: HTMLElement,
     private img: HTMLImageElement,
     private label: HTMLElement,
     private message: HTMLElement,
+    private openMedia: HTMLButtonElement,
   ) {
     stage.addEventListener(
       "wheel",
@@ -35,12 +37,47 @@ export class ImageView {
     this.panzoom = null;
     this.img.hidden = true;
     this.img.removeAttribute("src");
+    if (this.video) {
+      // 解除文件引用，切换素材后不继续解码或播放声音。
+      this.video.pause();
+      this.video.removeAttribute("src");
+      this.video.load();
+      this.video.remove();
+      this.video = null;
+    }
+    this.openMedia.hidden = true;
     this.message.textContent = message;
     this.label.textContent = "";
   }
   async prepare(item: EagleItem): Promise<() => void> {
     const generation = ++this.generation;
-    let preview = !nativeExtensions.has(item.ext.toLowerCase());
+    if (isVideo(item)) {
+      // 视频在采用当前选择后加载，不让解码等待阻塞笔记或下一次选图。
+      return () => {
+        if (generation !== this.generation) return;
+        this.clear("正在加载视频…");
+        const video = document.createElement("video");
+        this.video = video;
+        video.id = "video";
+        video.controls = true;
+        video.preload = "metadata";
+        video.playsInline = true;
+        video.setAttribute("aria-label", item.name);
+        video.addEventListener("loadeddata", () => {
+          if (this.video === video) this.message.textContent = "";
+        });
+        video.addEventListener("error", () => {
+          if (this.video !== video) return;
+          video.pause();
+          video.hidden = true;
+          this.message.textContent = "视频无法在工作台播放，请检查文件或使用系统播放器。";
+          this.openMedia.hidden = false;
+        });
+        this.stage.prepend(video);
+        video.src = fileURL(item.filePath);
+      };
+    }
+    let preview = !nativeImageExtensions.has(item.ext.toLowerCase());
     const nextImage = new Image();
     nextImage.id = "image";
     nextImage.draggable = false;
@@ -66,7 +103,7 @@ export class ImageView {
         this.clear("图片暂时无法读取，请检查素材库磁盘连接。");
         return;
       }
-      this.panzoom?.destroy();
+      this.clear();
       this.width = nextImage.naturalWidth;
       this.height = nextImage.naturalHeight;
       this.fitMode = true;
@@ -87,6 +124,9 @@ export class ImageView {
       });
       this.updateLabel();
     };
+  }
+  pause() {
+    this.video?.pause();
   }
   private fitScale() {
     return Math.max(

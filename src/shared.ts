@@ -1,17 +1,21 @@
 import MarkdownIt from "markdown-it";
 
-export const imageExtensions = new Set(
+const imageExtensions = new Set(
   "jpg jpeg png webp gif bmp avif svg tif tiff heic heif psd ai eps raw cr2 cr3 nef arw dng raf orf rw2 jxl".split(
     " ",
   ),
 );
-export const nativeExtensions = new Set(
+export const nativeImageExtensions = new Set(
   "jpg jpeg png webp gif bmp avif svg".split(" "),
+);
+const videoExtensions = new Set(
+  "mp4 m4v mov webm mkv avi wmv flv mpg mpeg ts mts m2ts 3gp ogv".split(" "),
 );
 export const $ = <T extends HTMLElement = HTMLElement>(id: string) =>
   document.getElementById(id) as T;
-export const isImage = (item: EagleItem) =>
-  imageExtensions.has(item.ext.toLowerCase()) && !item.isDeleted;
+export const isVideo = (item: EagleItem) => videoExtensions.has(item.ext.toLowerCase());
+export const isMedia = (item: EagleItem) =>
+  !item.isDeleted && (imageExtensions.has(item.ext.toLowerCase()) || isVideo(item));
 
 // Markdown 禁用原始 HTML，避免笔记内容在启用 Node 的插件中执行脚本。
 const markdown = new MarkdownIt({ html: false, linkify: true, breaks: true });

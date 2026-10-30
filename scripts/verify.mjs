@@ -11,6 +11,8 @@ const libraryA = path.join(root, '验收 A.library');
 const libraryB = path.join(root, '验收 B.library');
 await mkdir(libraryA); await mkdir(libraryB);
 await copyFile('scripts/fixtures/composition.svg', path.join(root, '构图 示例.svg'));
+await copyFile('scripts/fixtures/motion.mp4', path.join(root, '运动 # 示例.mp4'));
+await writeFile(path.join(root, '损坏.mp4'), '损坏的测试媒体文件');
 const original = '# 光与形的秩序\n\n## 视觉重心\n\n暖色圆形与左侧深色斜线形成对照，视线沿着斜向结构进入画面。\n\n- **主次**：暖色形体承担焦点。\n- **空间**：竖向边界将画面分为疏密不同的两个区域。\n\n> 先看整体关系，再观察局部细节。\n\n## 色彩关系\n\n灰绿、暖赭与米白共同形成克制的配色。\n\n[参考链接](https://example.com/)\n';
 const makeItem = (id, name, annotation = original) => ({ id, name, annotation, ext: 'svg', filePath: path.join(root, '构图 示例.svg'), thumbnailPath: path.join(root, '构图 示例.svg'), width: 1400, height: 1000, folders: ['F1'], tags: ['保留标签'], isDeleted: false });
 const initial = { library: libraryA, selected: ['A'], folders: ['F1'], theme: 'DARK', libraries: { [libraryA]: { A: makeItem('A', '01 · 光与形'), B: makeItem('B', '02 · 色彩关系', '第二张原生注释'), C: makeItem('C', '03 · 留白', '') }, [libraryB]: { A: makeItem('A', '另一素材库同 ID', '另一素材库的内容') } } };
@@ -261,7 +263,7 @@ try {
   const readingBeforeNotice = await page.locator('#reading').boundingBox();
   await page.locator('#previous').click();
   await page.locator('#notice:not([hidden])').waitFor();
-  assert.equal(await page.locator('#notice').innerText(), '已是第一张图片');
+  assert.equal(await page.locator('#notice').innerText(), '已是第一个素材');
   assert.deepEqual(await page.locator('#workspace').boundingBox(), layoutBeforeNotice);
   assert.deepEqual(await page.locator('#reading').boundingBox(), readingBeforeNotice);
   await page.locator('#notice').waitFor({ state: 'hidden', timeout: 5000 });
@@ -270,7 +272,7 @@ try {
   const layoutAtLast = await page.locator('#workspace').boundingBox();
   await page.locator('#next').click();
   await page.locator('#notice:not([hidden])').waitFor();
-  assert.equal(await page.locator('#notice').innerText(), '已是最后一张图片');
+  assert.equal(await page.locator('#notice').innerText(), '已是最后一个素材');
   assert.deepEqual(await page.locator('#workspace').boundingBox(), layoutAtLast);
   await control('select', ['A']);
   await until(async () => (await page.locator('#reading').innerText()).includes('光与形'), '恢复首张');
@@ -290,7 +292,7 @@ try {
 
   const before = await page.locator('#reading').boundingBox();
   const beforeZoom = await page.locator('#image').getAttribute('style');
-  const stage = await page.locator('#image-stage').boundingBox();
+  const stage = await page.locator('#media-stage').boundingBox();
   await page.mouse.move(stage.x + stage.width / 2, stage.y + stage.height / 2);
   await page.mouse.wheel(0, -450);
   await until(async () => (await page.locator('#image').getAttribute('style')) !== beforeZoom, '滚轮缩放');
@@ -323,6 +325,74 @@ try {
   assert.equal(await rich.locator('a[href^="javascript:"]').count(), 0);
   await page.locator('#read-mode').click();
   pass('原生注释中的 HTML 和脚本链接不会在插件中执行');
+
+  const videoPath = path.join(root, '运动 # 示例.mp4');
+  const brokenPath = path.join(root, '损坏.mp4');
+  await control('items', {
+    V: { ...makeItem('V', '04 · 动态构图', '# 动态构图\n\n观察运动方向。'), ext: 'mp4', filePath: videoPath, width: 320, height: 180 },
+    X: { ...makeItem('X', '损坏视频', '无法播放时仍可阅读与编辑笔记'), ext: 'mp4', filePath: brokenPath, folders: ['F2'] }
+  });
+  await control('select', ['V']);
+  const video = page.locator('#video');
+  await video.waitFor();
+  await until(async () => video.evaluate(v => v.readyState >= 2 && v.videoWidth === 320), 'MP4 首帧解码');
+  assert(await video.evaluate(v => v.controls && v.paused && v.currentTime === 0));
+  assert(await page.locator('#fit').isHidden());
+  assert.match(await page.locator('#reading').innerText(), /动态构图/);
+  await video.evaluate(v => v.play());
+  await until(async () => video.evaluate(v => v.currentTime > 0.2), '实际视频播放');
+  await video.evaluate(v => { v.pause(); v.currentTime = 2; v.volume = 0.35; });
+  await until(async () => video.evaluate(v => !v.seeking && Math.abs(v.currentTime - 2) < 0.1), '视频定位');
+  assert.equal(await video.evaluate(v => v.volume), 0.35);
+  await mkdir('artifacts/verification', { recursive: true });
+  await control('capture', path.resolve('artifacts/verification/workbench-video.png'));
+  pass('真实 H.264/AAC MP4 可解码、播放、暂停、定位与调音量，含空格和井号的文件路径可读取');
+
+  await video.evaluate(v => v.play());
+  await control('hide');
+  await until(async () => video.evaluate(v => v.paused), '隐藏工作台暂停视频');
+  await control('run');
+  assert(await video.evaluate(v => v.paused));
+  const detachedVideo = await video.elementHandle();
+  await page.locator('#rich-mode').click();
+  await pasteRich('# 视频笔记\n\n切换素材前的最后一次输入。');
+  await video.evaluate(v => { v.currentTime = 0; return v.play(); });
+  await control('select', ['A']);
+  await page.locator('#image:not([hidden])').waitFor();
+  assert.match((await state()).libraries[libraryA].V.annotation, /最后一次输入/);
+  assert(await detachedVideo.evaluate(v => v.paused && !v.hasAttribute('src') && !v.isConnected));
+  assert(await page.locator('#fit').isVisible());
+  await control('select', ['C']);
+  await until(async () => (await page.title()).includes('留白'), '图片导航起点');
+  await page.locator('#next').click();
+  await video.waitFor();
+  assert.match(await rich.innerText(), /视频笔记/);
+  await page.locator('#previous').click();
+  await until(async () => (await page.title()).includes('留白'), '视频返回图片');
+  pass('视频笔记立即切换时保存，隐藏时暂停，切回图片释放播放器，前后导航同时包含图片与视频');
+
+  await control('select', ['X']);
+  await page.locator('#open-media:not([hidden])').waitFor();
+  assert.match(await page.locator('#media-message').innerText(), /视频无法在工作台播放/);
+  assert.match(await rich.innerText(), /仍可阅读与编辑/);
+  await pasteRich('损坏视频的笔记仍能保存');
+  await until(async () => (await state()).libraries[libraryA].X.annotation.trim() === '损坏视频的笔记仍能保存', '解码失败后的保存');
+  await page.locator('#open-media').click();
+  assert.equal((await state()).lastOpenPath, brokenPath);
+  pass('视频解码失败不阻止笔记读写，系统播放器入口传入对应原文件路径');
+
+  const mediaBackup = path.join(root, '图片与视频备份.json');
+  await control('dialog', { canceled: false, filePath: mediaBackup });
+  await page.locator('#more-menu summary').click(); await page.locator('#backup').click();
+  await until(async () => { try { return JSON.parse(await readFile(mediaBackup, 'utf8')).notes.V.annotation.includes('最后一次输入'); } catch { return false; } }, '视频注释备份');
+  await control('annotation', 'V', '');
+  await control('dialog', { canceled: false, filePaths: [mediaBackup] });
+  await page.locator('#more-menu summary').click(); await page.locator('#restore').click();
+  await until(async () => (await state()).libraries[libraryA].V.annotation.includes('最后一次输入'), '恢复视频注释');
+  pass('注释备份包含视频，恢复可补充视频的空白注释');
+  await control('select', ['A']);
+  await page.locator('#image:not([hidden])').waitFor();
+  await page.locator('#read-mode').click();
 
   await control('annotation', 'A', original);
   await page.locator('#font-size').selectOption('17');

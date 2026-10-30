@@ -72,7 +72,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round
   flex: 1;
   min-height: 0;
 }
-.image-pane, .note-pane {
+.media-pane, .note-pane {
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -96,10 +96,12 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round
 .button-group button { font-size: 18px; width: 30px; padding: 0; }
 .pane-toolbar .muted { font-size: 11px; margin-left: 6px; white-space: nowrap; }
 .zoom-label { width: 37px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 11px; }
-.image-stage { flex: 1; min-height: 0; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--canvas); }
-.image-stage img { max-width: none; max-height: none; flex-shrink: 0; user-select: none; }
-.image-message { position: absolute; bottom: 14px; left: 20px; right: 20px; text-align: center; color: var(--muted); pointer-events: none; font-size: 12px; }
-.image-message:empty { display: none; }
+.media-stage { flex: 1; min-height: 0; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--canvas); }
+.media-stage img { max-width: none; max-height: none; flex-shrink: 0; user-select: none; }
+.media-feedback { position: absolute; bottom: 14px; left: 20px; right: 20px; text-align: center; color: var(--muted); pointer-events: none; font-size: 12px; }
+.media-feedback p:empty { display: none; }
+.media-feedback button { pointer-events: auto; background: var(--toolbar); }
+.media-stage video { width: 100%; height: 100%; min-height: 0; object-fit: contain; }
 .divider { cursor: col-resize; position: relative; touch-action: none; border-radius: 8px; }
 .divider:after { content: ""; height: 32px; width: 3px; border-radius: 3px; background: var(--muted); position: absolute; top: 50%; left: 3px; opacity: .25; }
 .divider:hover:after, .divider:focus-visible:after { opacity: .7; }

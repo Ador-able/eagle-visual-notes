@@ -3,13 +3,14 @@ import {
   applyTheme,
   bindLinks,
   errorMessage,
-  isImage,
+  isMedia,
+  isVideo,
   renderMarkdown,
 } from "./shared";
 import { writeText } from "./files";
 import { NoteEditor } from "./editor";
 import { RichNoteEditor } from "./rich-editor";
-import { ImageView } from "./image-view";
+import { MediaView } from "./media-view";
 import {
   backupLibrary,
   loadNote,
@@ -71,11 +72,12 @@ function focusEditor() {
 function editorHasFocus() {
   return editor.view.hasFocus || richEditor.hasFocus;
 }
-const imageView = new ImageView(
-  $("image-stage"),
+const mediaView = new MediaView(
+  $("media-stage"),
   $("image"),
   $("zoom"),
-  $("image-message"),
+  $("media-message"),
+  $("open-media"),
 );
 
 function showError(error: unknown) {
@@ -122,15 +124,15 @@ function updateMode() {
 }
 function present(
   doc: NoteDocument | null,
-  message = "在 Eagle 中选择一张图片",
-  commitImage?: () => void,
+  message = "在 Eagle 中选择图片或视频",
+  commitMedia?: () => void,
 ) {
   current = doc;
   editor.setText(doc?.text || "");
   richEditor.setText(doc?.text || "", true);
   document.title = doc ? `${doc.item.name} — 视觉笔记` : "视觉笔记";
   $("window-title").textContent = doc?.item.name || "视觉笔记";
-  $("image-meta").textContent = doc
+  $("media-meta").textContent = doc
     ? `${doc.item.width} × ${doc.item.height}`
     : "";
   $("word-count").textContent = doc
@@ -140,9 +142,11 @@ function present(
   $("navigation-scope").textContent = "";
   for (const id of ["previous", "next", "fit", "actual", "export-note"])
     $<HTMLButtonElement>(id).disabled = !doc;
+  for (const id of ["fit", "actual", "zoom"])
+    $(id).hidden = !!doc && isVideo(doc.item);
   if (doc) {
-    if (commitImage) commitImage();
-  } else imageView.clear(message);
+    if (commitMedia) commitMedia();
+  } else mediaView.clear(message);
   $("note-empty").querySelector("p")!.textContent = message;
   $("reading").scrollTop = 0;
   updateMode();
@@ -187,7 +191,7 @@ async function syncSelection() {
     const selected = await eagle.item.getSelected();
     if (library !== eagle.library.path) return;
     const item =
-      selected.length === 1 && isImage(selected[0]) ? selected[0] : null;
+      selected.length === 1 && isMedia(selected[0]) ? selected[0] : null;
     if (current?.library === library && current.item.id === item?.id) {
       // 丢弃本次输入之前发出的旧查询，避免将已经保存的新文字显示成旧内容。
       const annotation = item?.annotation || "";
@@ -210,14 +214,15 @@ async function syncSelection() {
       return;
     }
     const hadEditorFocus = editorHasFocus();
+    mediaView.pause();
     switching = true;
     setEditable(false);
     try {
       await flush();
       const doc = item ? loadNote(library, item) : null;
-      const commitImage = item ? await imageView.prepare(item) : undefined;
+      const commitMedia = item ? await mediaView.prepare(item) : undefined;
       const latest = await eagle.item.getSelected();
-      // 查询返回后再次核对选择，快速切图时不展示已经过时的结果。
+      // 查询返回后再次核对选择，快速切换时不展示已经过时的结果。
       if (
         library !== eagle.library.path ||
         selected.map((i) => i.id).join(",") !==
@@ -226,11 +231,11 @@ async function syncSelection() {
         return;
       const message =
         selected.length > 1
-          ? `已选中 ${selected.length} 个素材，请单选一张图片`
+          ? `已选中 ${selected.length} 个素材，请单选一项`
           : selected.length
-            ? "请选择图片素材"
-            : "在 Eagle 中选择一张图片";
-      present(doc, message, commitImage);
+            ? "请选择图片或视频素材"
+            : "在 Eagle 中选择图片或视频";
+      present(doc, message, commitMedia);
       clearError();
     } finally {
       switching = false;
@@ -350,7 +355,7 @@ async function navigate(direction: number) {
       fields: ["id", "name", "ext", "isDeleted"],
     })
   )
-    .filter(isImage)
+    .filter(isMedia)
     .sort(
       (a, b) =>
         a.name.localeCompare(b.name, "zh-CN", { numeric: true }) ||
@@ -359,16 +364,16 @@ async function navigate(direction: number) {
   if (library !== eagle.library.path) return;
   const index = items.findIndex((item) => item.id === current!.item.id);
   if (index < 0)
-    throw new Error("当前图片不在所选文件夹中，请在 Eagle 中重新选择图片。");
+    throw new Error("当前素材不在所选文件夹中，请在 Eagle 中重新选择。");
   const target = items[index + direction];
   $("navigation-scope").textContent =
     `${folders.length ? "当前文件夹" : "本素材库"} · 名称顺序`;
   if (!target) {
-    notice(direction < 0 ? "已是第一张图片" : "已是最后一张图片");
+    notice(direction < 0 ? "已是第一个素材" : "已是最后一个素材");
     return;
   }
   if (!(await eagle.item.select([target.id])))
-    throw new Error("Eagle 未能切换图片，请在主窗口选择。");
+    throw new Error("Eagle 未能切换素材，请在主窗口选择。");
   notice("");
 }
 async function exportCurrent() {
@@ -393,7 +398,13 @@ onAction("retry", async () => {
   if (!saveBlocked) clearError();
 });
 onAction("export-note", exportCurrent);
-onAction("window-minimize", () => eagle.window.minimize());
+onAction("open-media", async () => {
+  if (current) await eagle.shell.openPath(current.item.filePath);
+});
+onAction("window-minimize", async () => {
+  mediaView.pause();
+  await eagle.window.minimize();
+});
 onAction("window-maximize", async () => {
   if (await eagle.window.isFullScreen()) await eagle.window.setFullScreen(false);
   else if (await eagle.window.isMaximized()) await eagle.window.unmaximize();
@@ -414,13 +425,13 @@ onAction("backup", async () => {
   const library = eagle.library.path;
   if (!library) return;
   const result = await eagle.dialog.showSaveDialog({
-    title: "备份本库图片注释",
+    title: "备份本库图片与视频注释",
     defaultPath: `原生注释-${new Date().toISOString().slice(0, 10)}.json`,
     filters: [{ name: "注释备份", extensions: ["json"] }],
   });
   if (!result.canceled && result.filePath) {
     await backupLibrary(library, result.filePath);
-    notice("本库图片注释已备份");
+    notice("本库图片与视频注释已备份");
   }
 });
 onAction("restore", async () => {
@@ -444,8 +455,8 @@ onAction("restore", async () => {
     );
   }
 });
-$("fit").onclick = () => imageView.fit();
-$("actual").onclick = () => imageView.actual();
+$("fit").onclick = () => mediaView.fit();
+$("actual").onclick = () => mediaView.actual();
 for (const mode of ["read", "rich", "source"] as const) {
   $(`${mode}-mode`).onclick = () => {
     if (!current || switching || actionBusy) return;
@@ -610,6 +621,7 @@ eagle.onPluginShow(() => {
   if (ready) void syncSelection().catch(showError);
 });
 eagle.onPluginHide(() => {
+  mediaView.pause();
   void (async () => {
     await rememberWindow();
     visible = false;
@@ -624,13 +636,18 @@ eagle.onLibraryChanged(() => {
 });
 eagle.onThemeChanged(applyTheme);
 eagle.onPluginBeforeExit(() => {
+  mediaView.clear();
   disposed = true;
   clearTimeout(tickTimer);
   clearTimeout(noticeTimer);
 });
 window.addEventListener("beforeunload", (event) => {
+  mediaView.pause();
   if (!current || current.text === current.base) return;
   event.preventDefault();
   event.returnValue = false as unknown as string;
   void flush().catch(showError);
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) mediaView.pause();
 });

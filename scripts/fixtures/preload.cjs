@@ -20,7 +20,7 @@ global.eagle = {
   folder: { getSelected: () => call('folders') },
   window: Object.fromEntries(['show', 'hide', 'minimize', 'getBounds', 'setBounds', 'isMaximized', 'maximize', 'unmaximize', 'isFullScreen', 'setFullScreen'].map(name => [name, value => call('window', [name, value])])),
   screen: { getAllDisplays: () => call('displays') },
-  shell: { openExternal: url => call('external', url) },
+  shell: { openExternal: url => call('external', url), openPath: path => call('openPath', path) },
   dialog: { showSaveDialog: () => call('dialog'), showOpenDialog: () => call('dialog'), showMessageBox: () => call('dialog') }
 };
 ipcRenderer.on('fixture-event', (_, name, value) => {
