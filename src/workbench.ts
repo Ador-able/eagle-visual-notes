@@ -397,7 +397,14 @@ onAction("retry", async () => {
   await flush();
   if (!saveBlocked) clearError();
 });
-onAction("export-note", exportCurrent);
+// 保存尚未返回时，仍可导出窗口内的文本。
+let exporting = false;
+$("export-note").addEventListener("click", () => {
+  $<HTMLDetailsElement>("more-menu").open = false;
+  if (exporting) return;
+  exporting = true;
+  void exportCurrent().catch(showError).finally(() => { exporting = false; });
+});
 onAction("open-media", async () => {
   if (current) await eagle.shell.openPath(current.item.filePath);
 });
@@ -448,8 +455,10 @@ onAction("restore", async () => {
       library,
       result.filePaths[0],
     );
-    if (current?.library === library && library === eagle.library.path)
-      present(loadNote(library, await eagle.item.getById(current.item.id)));
+    if (current?.library === library && library === eagle.library.path) {
+      const item = await eagle.item.getById(current.item.id);
+      if (item) present(loadNote(library, item));
+    }
     notice(
       `已补充 ${restored} 条注释，保留 ${skipped} 条已有注释，${missing} 个素材未找到`,
     );

@@ -16,6 +16,7 @@ import { keymap } from "@milkdown/kit/prose/keymap";
 import { getMarkRange } from "@milkdown/kit/prose";
 import { $prose, callCommand, replaceAll } from "@milkdown/kit/utils";
 import { $ } from "./shared";
+import { resolveNoteImage } from "./note-images";
 import "@milkdown/kit/prose/view/style/prosemirror.css";
 import "@milkdown/kit/prose/gapcursor/style/gapcursor.css";
 
@@ -44,6 +45,16 @@ export class RichNoteEditor {
         ctx.set(editorViewOptionsCtx, {
           editable: () => this.editable,
           attributes: { class: "markdown", "aria-label": "渲染笔记编辑器", spellcheck: "false" },
+          nodeViews: { image: (node) => {
+            const image = document.createElement("img");
+            image.src = node.attrs.src;
+            image.alt = node.attrs.alt;
+            if (node.attrs.title) image.title = node.attrs.title;
+            image.draggable = true;
+            resolveNoteImage(image, node.attrs.src);
+            // 只更新显示地址，文档中始终保留素材 ID。
+            return { dom: image, ignoreMutation: () => true };
+          } },
           handleDOMEvents: { click: (_view, event) => {
             if (!(event.target as Element).closest("a")) return false;
             event.preventDefault();

@@ -1,4 +1,5 @@
 import MarkdownIt from "markdown-it";
+import { resolveNoteImage } from "./note-images";
 
 const imageExtensions = new Set(
   "jpg jpeg png webp gif bmp avif svg tif tiff heic heif psd ai eps raw cr2 cr3 nef arw dng raf orf rw2 jxl".split(
@@ -23,6 +24,8 @@ export function renderMarkdown(target: HTMLElement, text: string) {
   target.innerHTML = text.trim()
     ? markdown.render(text)
     : '<p class="empty-note">还没有分析笔记</p>';
+  for (const image of target.querySelectorAll("img"))
+    resolveNoteImage(image, image.getAttribute("src") || "");
 }
 export function bindLinks(
   target: HTMLElement,

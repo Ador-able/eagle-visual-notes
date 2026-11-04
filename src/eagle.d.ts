@@ -36,7 +36,7 @@ declare const eagle: {
       folders?: string[];
       fields?: string[];
     }): Promise<EagleItem[]>;
-    getById(id: string): Promise<EagleItem>;
+    getById(id: string): Promise<EagleItem | undefined>;
     select(ids: string[]): Promise<boolean>;
   };
   folder: { getSelected(): Promise<{ id: string }[]> };
