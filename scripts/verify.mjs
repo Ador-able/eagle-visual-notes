@@ -329,7 +329,7 @@ try {
   const videoPath = path.join(root, '运动 # 示例.mp4');
   const brokenPath = path.join(root, '损坏.mp4');
   await control('items', {
-    V: { ...makeItem('V', '04 · 动态构图', '# 动态构图\n\n观察运动方向。'), ext: 'mp4', filePath: videoPath, width: 320, height: 180 },
+    V: { ...makeItem('V', '00 · 动态构图', '# 动态构图\n\n观察运动方向。'), ext: 'mp4', filePath: videoPath, width: 320, height: 180 },
     X: { ...makeItem('X', '损坏视频', '无法播放时仍可阅读与编辑笔记'), ext: 'mp4', filePath: brokenPath, folders: ['F2'] }
   });
   await control('select', ['V']);

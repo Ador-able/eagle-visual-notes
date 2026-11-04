@@ -1,0 +1,72 @@
+name: 构建与发布
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: 验证并发布
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: 安装依赖
+        run: npm ci
+      - name: 检查版本号
+        shell: pwsh
+        run: |
+          $manifest = Get-Content manifest.json -Raw | ConvertFrom-Json
+          $package = Get-Content package.json -Raw | ConvertFrom-Json
+          $lock = Get-Content package-lock.json -Raw | ConvertFrom-Json -AsHashtable
+          if ($manifest.version -notmatch '^\d+\.\d+\.\d+$' -or
+              $manifest.version -ne $package.version -or
+              $manifest.version -ne $lock.version -or
+              $manifest.version -ne $lock.packages[''].version) {
+            throw '版本号不一致或格式无效'
+          }
+      - name: 检查并打包
+        run: npm run package
+      - name: 运行集成验收
+        run: npm run verify
+      - name: 发布新版本
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          tag="v${version}"
+          if state=$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [ "$state" = true ]; then
+              echo "版本 ${tag} 存在草稿，请检查后重新运行。" >&2
+              exit 1
+            fi
+            echo "版本 ${tag} 已发布。"
+            exit 0
+          fi
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            if [ "$(git rev-list -n 1 "$tag")" != "$GITHUB_SHA" ]; then
+              echo "标签 ${tag} 指向其他提交，停止发布。" >&2
+              exit 1
+            fi
+          fi
+          gh release create "$tag" \
+            "release/eagle-visual-notes-${version}.eagleplugin" \
+            "release/eagle-visual-notes-${version}.eagleplugin.sha256" \
+            --target "$GITHUB_SHA" --title "视觉笔记 ${tag}" --generate-notes

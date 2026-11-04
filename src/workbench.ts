@@ -349,25 +349,20 @@ async function navigate(direction: number) {
   if (library !== eagle.library.path)
     throw new Error("素材库已切换，请等待笔记同步。");
   const folders = await eagle.folder.getSelected();
+  // 过滤非媒体素材时保留 Eagle 接口的返回顺序。
   const items = (
     await eagle.item.get({
       folders: folders.length ? folders.map((f) => f.id) : undefined,
       fields: ["id", "name", "ext", "isDeleted"],
     })
-  )
-    .filter(isMedia)
-    .sort(
-      (a, b) =>
-        a.name.localeCompare(b.name, "zh-CN", { numeric: true }) ||
-        a.id.localeCompare(b.id),
-    );
+  ).filter(isMedia);
   if (library !== eagle.library.path) return;
   const index = items.findIndex((item) => item.id === current!.item.id);
   if (index < 0)
     throw new Error("当前素材不在所选文件夹中，请在 Eagle 中重新选择。");
   const target = items[index + direction];
   $("navigation-scope").textContent =
-    `${folders.length ? "当前文件夹" : "本素材库"} · 名称顺序`;
+    `${folders.length ? "当前文件夹" : "本素材库"} · Eagle 返回顺序`;
   if (!target) {
     notice(direction < 0 ? "已是第一个素材" : "已是最后一个素材");
     return;
