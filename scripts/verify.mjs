@@ -339,6 +339,8 @@ try {
   assert(await video.evaluate(v => v.controls && v.paused && v.currentTime === 0));
   assert(await page.locator('#fit').isHidden());
   assert.match(await page.locator('#reading').innerText(), /动态构图/);
+  // 托管环境可能没有音频输出设备，静音后仍验证视频实际播放。
+  if (process.env.CI) await video.evaluate(v => { v.muted = true; });
   await video.evaluate(v => v.play());
   await until(async () => video.evaluate(v => v.currentTime > 0.2), '实际视频播放');
   await video.evaluate(v => { v.pause(); v.currentTime = 2; v.volume = 0.35; });
