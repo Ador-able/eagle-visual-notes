@@ -5,8 +5,11 @@ const writeFileAtomic = require('write-file-atomic');
 
 // 验收夹具只替代 Eagle 边界，页面、编辑器、文件写入与打包产物均使用真实实现。
 const root = process.argv.at(-1);
-// 托管验收环境没有可用的硬件图形设备。
-if (process.env.CI) app.disableHardwareAcceleration();
+// 托管验收环境使用软件渲染，并避开不兼容的图形沙箱。
+if (process.env.CI) {
+  app.disableHardwareAcceleration();
+  app.commandLine.appendSwitch('disable-gpu-sandbox');
+}
 app.setPath('userData', path.join(root, 'user-data'));
 let state = JSON.parse(fs.readFileSync(path.join(root, 'state.json'), 'utf8'));
 let workbench;
