@@ -294,7 +294,9 @@ try {
   const beforeZoom = await page.locator('#image').getAttribute('style');
   const stage = await page.locator('#media-stage').boundingBox();
   await page.mouse.move(stage.x + stage.width / 2, stage.y + stage.height / 2);
+  await page.keyboard.down('Control');
   await page.mouse.wheel(0, -450);
+  await page.keyboard.up('Control');
   await until(async () => (await page.locator('#image').getAttribute('style')) !== beforeZoom, '滚轮缩放');
   const zoom = await page.locator('#zoom').innerText();
   assert.notEqual(zoom, '');

@@ -19,10 +19,28 @@
   </header>
   <div id="error" class="error-banner" role="alert" hidden><span id="error-text"></span><button id="retry">重试保存</button></div>
   <div id="notice" class="notice" role="status" hidden></div>
+  <div id="palette-tooltip" class="palette-tooltip" role="tooltip" hidden></div>
+  <section id="color-panel" class="color-panel" role="dialog" aria-labelledby="color-panel-title" tabindex="-1" hidden>
+    <header><strong id="color-panel-title">色盘</strong><span id="color-ratio" class="color-ratio"></span><button id="color-close" aria-label="关闭色盘" title="关闭色盘">×</button></header>
+    <div class="color-picker" aria-hidden="true"><div id="color-wheel"></div><div id="color-square"></div></div>
+    <div class="color-channels">
+      <label><span>色相</span><input id="color-h" type="range" min="0" max="360" step="1"><output id="color-h-value" for="color-h"></output></label>
+      <label><span>饱和度</span><input id="color-s" type="range" min="0" max="100" step="1"><output id="color-s-value" for="color-s"></output></label>
+      <label><span>亮度</span><input id="color-v" type="range" min="0" max="100" step="1"><output id="color-v-value" for="color-v"></output></label>
+    </div>
+    <div class="color-values"><span id="color-preview" class="color-preview"></span><input id="color-hex" aria-label="HEX 色值" readonly><button id="color-copy">复制</button></div>
+    <p id="color-rgb" class="color-rgb"></p>
+    <p id="color-copy-state" class="color-copy-state" role="status" hidden></p>
+  </section>
   <main id="workspace" class="workspace">
     <section class="media-pane" aria-label="素材预览">
-      <div class="pane-toolbar"><div class="button-group"><button id="previous" title="Eagle 返回顺序 · Alt+←" aria-label="上一个素材">←</button><button id="next" title="Eagle 返回顺序 · Alt+→" aria-label="下一个素材">→</button></div><span id="media-meta" class="muted"></span><div class="spacer"></div><button id="fit" title="重置缩放和平移">适应</button><button id="actual" title="预览图的原始像素比例">1:1</button><span id="zoom" class="zoom-label"></span></div>
-      <div id="media-stage" class="media-stage"><img id="image" hidden draggable="false" alt=""><div class="media-feedback"><p id="media-message" role="status">在 Eagle 中选择图片或视频</p><button id="open-media" hidden>用系统播放器打开</button></div></div>
+      <div class="pane-toolbar media-toolbar">
+        <div class="button-group"><button id="previous" title="Eagle 返回顺序 · Alt+←" aria-label="上一个素材">←</button><button id="next" title="Eagle 返回顺序 · Alt+→" aria-label="下一个素材">→</button></div>
+        <span id="media-meta" class="muted"></span>
+        <div id="palette-slot" class="palette-slot" hidden><div id="media-palette" class="media-palette" role="group" aria-label="素材配色"></div></div>
+        <div class="media-controls"><button id="fit" title="重置缩放和平移">适应</button><button id="actual" title="预览图的原始像素比例">1:1</button><span id="zoom" class="zoom-label"></span></div>
+      </div>
+      <div id="media-stage" class="media-stage"><div class="image-frame"><img id="image" hidden draggable="false" alt=""></div><div class="media-feedback"><p id="media-message" role="status">在 Eagle 中选择图片或视频</p><button id="open-media" hidden>用系统播放器打开</button></div></div>
     </section>
     <div id="divider" class="divider" role="separator" tabindex="0" aria-label="调整素材与笔记比例" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="52"></div>
     <section class="note-pane" aria-label="分析笔记">

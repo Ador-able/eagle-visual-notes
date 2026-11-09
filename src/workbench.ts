@@ -11,6 +11,7 @@ import { writeText } from "./files";
 import { NoteEditor } from "./editor";
 import { RichNoteEditor } from "./rich-editor";
 import { MediaView } from "./media-view";
+import { ColorPalette } from "./color-palette";
 import {
   backupLibrary,
   loadNote,
@@ -79,6 +80,7 @@ const mediaView = new MediaView(
   $("media-message"),
   $("open-media"),
 );
+const colorPalette = new ColorPalette($("palette-slot"), $("color-panel"));
 
 function showError(error: unknown) {
   $("error-text").textContent = errorMessage(error);
@@ -128,6 +130,7 @@ function present(
   commitMedia?: () => void,
 ) {
   current = doc;
+  colorPalette.update(doc?.item);
   editor.setText(doc?.text || "");
   richEditor.setText(doc?.text || "", true);
   document.title = doc ? `${doc.item.name} — 视觉笔记` : "视觉笔记";
@@ -193,6 +196,7 @@ async function syncSelection() {
     const item =
       selected.length === 1 && isMedia(selected[0]) ? selected[0] : null;
     if (current?.library === library && current.item.id === item?.id) {
+      colorPalette.update(item!);
       // 丢弃本次输入之前发出的旧查询，避免将已经保存的新文字显示成旧内容。
       const annotation = item?.annotation || "";
       if (

@@ -19,7 +19,7 @@ export class MediaView {
     stage.addEventListener(
       "wheel",
       (event) => {
-        if (!this.panzoom) return;
+        if (!event.ctrlKey || !this.panzoom) return;
         event.preventDefault();
         this.fitMode = false;
         this.panzoom.zoomWithWheel(event);
@@ -121,6 +121,8 @@ export class MediaView {
         maxScale: 32,
         animate: false,
         cursor: "grab",
+        // 图片外层只提供坐标，裁切由预览区域负责。
+        overflow: "visible",
       });
       this.updateLabel();
     };

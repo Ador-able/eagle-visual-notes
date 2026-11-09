@@ -1,3 +1,7 @@
+interface EaglePalette {
+  color: [number, number, number];
+  ratio: number;
+}
 interface EagleItem {
   id: string;
   name: string;
@@ -7,6 +11,7 @@ interface EagleItem {
   annotation: string;
   width: number;
   height: number;
+  palettes?: EaglePalette[];
   isDeleted?: boolean;
   save(): Promise<void>;
 }
