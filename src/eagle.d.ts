@@ -38,6 +38,7 @@ declare const eagle: {
   item: {
     getSelected(): Promise<EagleItem[]>;
     get(options: {
+      ids?: string[];
       folders?: string[];
       fields?: string[];
     }): Promise<EagleItem[]>;

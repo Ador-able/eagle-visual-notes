@@ -12,11 +12,15 @@ import { NoteEditor } from "./editor";
 import { RichNoteEditor } from "./rich-editor";
 import { MediaView } from "./media-view";
 import { ColorPalette } from "./color-palette";
+import { GroupView } from "./group-view";
+import { parseNote } from "./note-group";
 import {
   backupLibrary,
   loadNote,
   restoreLibrary,
   saveNote,
+  needsSave,
+  removeMember,
   type NoteDocument,
 } from "./storage";
 
@@ -51,6 +55,8 @@ let restoredWindow = false;
 let lastGeometry = 0;
 let disposed = false;
 let editVersion = 0;
+let selectionKey = "";
+let analysisRequested = true;
 function noteChanged(text: string) {
   if (!current || switching) return;
   current.text = text;
@@ -81,11 +87,52 @@ const mediaView = new MediaView(
   $("open-media"),
 );
 const colorPalette = new ColorPalette($("palette-slot"), $("color-panel"));
+const groupView = new GroupView(
+  id => void action(() => previewMember(id)),
+  id => void action(async () => {
+    if (!current?.group || current.choices.length) return;
+    await flush();
+    if (!current.group || current.members.length < 2 || !current.members.some(item => item.id === id)) return;
+    removeMember(current, id);
+    await eagle.item.select([current.item.id]);
+    present(current, "", await mediaView.prepare(current.item));
+    selectionKey = "";
+    await flush();
+  }),
+  text => void action(async () => {
+    if (!current) return;
+    current.text = text;
+    current.choices = [];
+    current.syncRequired = true;
+    present(current, "", await mediaView.prepare(current.item));
+    await flush();
+  }),
+);
+
+function updateMedia(doc: NoteDocument) {
+  colorPalette.update(doc.item);
+  const title = doc.group ? `组分析 · ${doc.members.length} 张` : doc.item.name;
+  document.title = `${title} — 视觉笔记`;
+  $("window-title").textContent = title;
+  $("media-meta").textContent = `${doc.item.width} × ${doc.item.height}`;
+  for (const id of ["fit", "actual", "zoom"]) $(id).hidden = isVideo(doc.item);
+  groupView.render(doc);
+}
+
+async function previewMember(id: string) {
+  if (!current) return;
+  const item = current.members.find(item => item.id === id);
+  if (!item) return;
+  const commit = await mediaView.prepare(item);
+  current.item = item;
+  commit();
+  updateMedia(current);
+}
 
 function showError(error: unknown) {
   $("error-text").textContent = errorMessage(error);
   $("error").hidden = false;
-  $("retry").hidden = !current || current.text === current.base;
+  $("retry").hidden = !current || !needsSave(current) || !!current.choices.length;
 }
 function clearError() {
   $("error").hidden = true;
@@ -112,14 +159,15 @@ function applySettings() {
   $<HTMLInputElement>("line-height").value = String(settings.lineHeight);
 }
 function updateMode() {
+  const available = !!current && !current.choices.length;
   $("note-empty").hidden = !!current;
-  $("reading").hidden = !current || settings.mode !== "read";
-  $("rich-editor").hidden = !current || settings.mode !== "rich";
-  $("editor").hidden = !current || settings.mode !== "source";
-  $("format-toolbar").hidden = !current || settings.mode === "read";
+  $("reading").hidden = !available || settings.mode !== "read";
+  $("rich-editor").hidden = !available || settings.mode !== "rich";
+  $("editor").hidden = !available || settings.mode !== "source";
+  $("format-toolbar").hidden = !available || settings.mode === "read";
   for (const mode of ["read", "rich", "source"] as const) {
     $(`${mode}-mode`).setAttribute("aria-pressed", String(settings.mode === mode));
-    $<HTMLButtonElement>(`${mode}-mode`).disabled = !current;
+    $<HTMLButtonElement>(`${mode}-mode`).disabled = !available;
   }
   if (current && settings.mode === "read") renderMarkdown($("reading"), current.text);
   if (current && settings.mode === "source") editor.view.requestMeasure();
@@ -130,6 +178,7 @@ function present(
   commitMedia?: () => void,
 ) {
   current = doc;
+  groupView.render(doc);
   colorPalette.update(doc?.item);
   editor.setText(doc?.text || "");
   richEditor.setText(doc?.text || "", true);
@@ -144,10 +193,11 @@ function present(
   $("save-state").textContent = "";
   $("navigation-scope").textContent = "";
   for (const id of ["previous", "next", "fit", "actual", "export-note"])
-    $<HTMLButtonElement>(id).disabled = !doc;
+    $<HTMLButtonElement>(id).disabled = !doc || (id === "export-note" && !!doc.choices.length);
   for (const id of ["fit", "actual", "zoom"])
     $(id).hidden = !!doc && isVideo(doc.item);
   if (doc) {
+    updateMedia(doc);
     if (commitMedia) commitMedia();
   } else mediaView.clear(message);
   $("note-empty").querySelector("p")!.textContent = message;
@@ -158,8 +208,8 @@ function present(
 async function flush() {
   if (savePromise) return savePromise;
   const doc = current;
-  if (!doc) return;
-  if (doc.text === doc.base) {
+  if (!doc || doc.choices.length) return;
+  if (!needsSave(doc)) {
     saveBlocked = false;
     $("save-state").textContent = "";
     return;
@@ -167,11 +217,12 @@ async function flush() {
   savePromise = (async () => {
     try {
       // 写入期间继续输入时，按顺序保存到最新文本。
-      while (doc.text !== doc.base) {
+      while (needsSave(doc)) {
         await saveNote(doc);
       }
       saveBlocked = false;
       $("save-state").textContent = "已保存";
+      updateMedia(doc);
       clearError();
     } catch (error) {
       saveBlocked = true;
@@ -193,62 +244,43 @@ async function syncSelection() {
     const wasSaving = !!savePromise;
     const selected = await eagle.item.getSelected();
     if (library !== eagle.library.path) return;
-    const item =
-      selected.length === 1 && isMedia(selected[0]) ? selected[0] : null;
-    if (current?.library === library && current.item.id === item?.id) {
-      colorPalette.update(item!);
-      // 丢弃本次输入之前发出的旧查询，避免将已经保存的新文字显示成旧内容。
-      const annotation = item?.annotation || "";
-      if (
-        version === editVersion &&
-        !wasSaving &&
-        current.text === current.base &&
-        !savePromise &&
-        annotation !== current.base
-      ) {
-        current.base = annotation;
-        current.text = annotation;
-        current.item = item!;
-        editor.setText(annotation);
-        richEditor.setText(annotation, true);
-        updateMode();
-        $("word-count").textContent =
-          `${annotation.replace(/\s/g, "").length.toLocaleString()} 字符`;
-      }
+    const key = JSON.stringify([library, selected.map(item => item.id)]);
+    const sameSelection = key === selectionKey;
+    // 保存中的轮询结果不能覆盖窗口内的新输入。
+    if (sameSelection && current && (wasSaving || savePromise || needsSave(current) && !current.choices.length || version !== editVersion)) return;
+    if (!sameSelection) await flush();
+    const valid = selected.length > 0 && selected.every(isMedia);
+    const unlinkedSelection = valid && selected.length > 1 && selected.every(item => !parseNote(item.annotation || "", item.id).group);
+    const requested = analysisRequested;
+    analysisRequested = false;
+    const openGroup = !unlinkedSelection || requested || sameSelection && !!current?.group;
+    const doc = valid && openGroup ? await loadNote(library, selected) : null;
+    if (library !== eagle.library.path || version !== editVersion || savePromise) return;
+    if (sameSelection && current && doc && current.snapshot === doc.snapshot &&
+      (current.choices.length || JSON.stringify(current.group) === JSON.stringify(doc.group) && !doc.syncRequired)) {
+      colorPalette.update(doc.members.find(item => item.id === current!.item.id));
+      clearError();
       return;
     }
     const hadEditorFocus = editorHasFocus();
-    mediaView.pause();
     switching = true;
     setEditable(false);
     try {
-      await flush();
-      const doc = item ? loadNote(library, item) : null;
-      const commitMedia = item ? await mediaView.prepare(item) : undefined;
+      if (sameSelection && current && doc) doc.item = doc.members.find(item => item.id === current!.item.id) || doc.item;
+      const commitMedia = doc ? await mediaView.prepare(doc.item) : undefined;
       const latest = await eagle.item.getSelected();
-      // 查询返回后再次核对选择，快速切换时不展示已经过时的结果。
-      if (
-        library !== eagle.library.path ||
-        selected.map((i) => i.id).join(",") !==
-          latest.map((i) => i.id).join(",")
-      )
-        return;
-      const message =
-        selected.length > 1
-          ? `已选中 ${selected.length} 个素材，请单选一项`
-          : selected.length
-            ? "请选择图片或视频素材"
-            : "在 Eagle 中选择图片或视频";
-      present(doc, message, commitMedia);
+      if (library !== eagle.library.path || key !== JSON.stringify([library, latest.map(item => item.id)])) return;
+      selectionKey = key;
+      analysisRequested = false;
+      present(doc, unlinkedSelection && !openGroup ? `已选择 ${selected.length} 张素材，请在 Eagle 中点击分析` : selected.length ? "请选择图片或视频素材" : "在 Eagle 中选择图片或视频", commitMedia);
+      if (doc && !doc.choices.length) await flush();
       clearError();
     } finally {
       switching = false;
       setEditable(true);
-      if (hadEditorFocus) focusEditor();
+      if (hadEditorFocus && !current?.choices.length) focusEditor();
     }
-  })().finally(() => {
-    syncPromise = null;
-  });
+  })().finally(() => { syncPromise = null; });
   return syncPromise;
 }
 
@@ -349,6 +381,12 @@ function onAction(id: string, operation: () => Promise<void>) {
 async function navigate(direction: number) {
   if (!current) return;
   await flush();
+  if (current.group) {
+    const index = current.members.findIndex(item => item.id === current!.item.id);
+    const target = current.members[index + direction];
+    if (target) await previewMember(target.id);
+    return;
+  }
   const library = current.library;
   if (library !== eagle.library.path)
     throw new Error("素材库已切换，请等待笔记同步。");
@@ -456,7 +494,7 @@ onAction("restore", async () => {
     );
     if (current?.library === library && library === eagle.library.path) {
       const item = await eagle.item.getById(current.item.id);
-      if (item) present(loadNote(library, item));
+      if (item) present(await loadNote(library, [item]));
     }
     notice(
       `已补充 ${restored} 条注释，保留 ${skipped} 条已有注释，${missing} 个素材未找到`,
@@ -467,7 +505,7 @@ $("fit").onclick = () => mediaView.fit();
 $("actual").onclick = () => mediaView.actual();
 for (const mode of ["read", "rich", "source"] as const) {
   $(`${mode}-mode`).onclick = () => {
-    if (!current || switching || actionBusy) return;
+    if (!current || current.choices.length || switching || actionBusy) return;
     try {
       if (mode === "rich") richEditor.setText(current.text);
       if (mode === "source" && editor.view.state.doc.toString() !== current.text)
@@ -602,6 +640,7 @@ document.addEventListener("keydown", (event) => {
   }
 });
 bindLinks($("reading"), showError);
+bindLinks($("group-preview"), showError);
 
 eagle.onPluginCreate(() => {
   void (async () => {
@@ -622,6 +661,7 @@ eagle.onPluginCreate(() => {
   });
 });
 eagle.onPluginRun(() => {
+  analysisRequested = true;
   void showWindow().catch(showError);
 });
 eagle.onPluginShow(() => {
@@ -651,7 +691,7 @@ eagle.onPluginBeforeExit(() => {
 });
 window.addEventListener("beforeunload", (event) => {
   mediaView.pause();
-  if (!current || current.text === current.base) return;
+  if (!current || !needsSave(current) || current.choices.length) return;
   event.preventDefault();
   event.returnValue = false as unknown as string;
   void flush().catch(showError);

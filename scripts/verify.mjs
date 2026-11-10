@@ -252,7 +252,7 @@ try {
   await control('select', []);
   await until(async () => !(await page.locator('#note-empty').isHidden()), '空选择');
   await control('select', ['A', 'B']);
-  await until(async () => (await page.locator('#note-empty').innerText()).includes('2 个素材'), '多选状态');
+  await until(async () => (await page.locator('#note-empty').innerText()).includes('2 张素材'), '多选状态');
   pass('未选择和多选时展示状态，不编辑任意一张图片');
 
   await control('annotation', 'A', original);

@@ -15,6 +15,7 @@ let state = JSON.parse(fs.readFileSync(path.join(root, 'state.json'), 'utf8'));
 let workbench;
 const manifest = JSON.parse(fs.readFileSync(path.resolve('dist/manifest.json'), 'utf8'));
 let failure = '';
+let readFailure = '';
 let delay = 0;
 let reloaded;
 const dialogs = [];
@@ -31,13 +32,16 @@ ipcMain.handle('fixture-call', async (event, method, args) => {
     return state.selected.map(id => state.libraries[state.library][id]).filter(Boolean);
   }
   if (method === 'get') {
+    if (readFailure) throw new Error(readFailure);
     let items = Object.values(state.libraries[state.library]);
+    if (args?.ids) items = items.filter(item => args.ids.includes(item.id));
     if (args?.folders?.length) items = items.filter(item => item.folders.some(id => args.folders.includes(id)));
     return items;
   }
   if (method === 'byId') return state.libraries[state.library][args];
   if (method === 'save') {
-    if (failure) throw new Error(failure);
+    if (typeof failure === 'string' && failure) throw new Error(failure);
+    if (failure && failure.id === args.id) throw new Error(failure.message);
     if (delay) await new Promise(resolve => setTimeout(resolve, delay));
     const item = state.libraries[state.library][args.id];
     if (!item) throw new Error('素材不存在');
@@ -84,6 +88,7 @@ app.whenReady().then(() => {
     annotation(id, text) { state.libraries[state.library][id].annotation = text; persist(); },
     items(items) { Object.assign(state.libraries[state.library], items); persist(); },
     failure(value) { failure = value; },
+    readFailure(value) { readFailure = value; },
     delay(value) { delay = value; },
     dialog(value) { dialogs.push(value); },
     theme(value) { state.theme = value; send('snapshot', snapshot()); send('theme', value); },
@@ -103,6 +108,8 @@ app.whenReady().then(() => {
       }
       finally { contents.decrementCapturerCount(true, true); }
     },
+    restart() { workbench.destroy(); openWorkbench(); },
+    shutdown() { if (!workbench.isDestroyed()) workbench.destroy(); },
     crash() { workbench.webContents.forcefullyCrashRenderer(); },
     state() { return state; }
   };

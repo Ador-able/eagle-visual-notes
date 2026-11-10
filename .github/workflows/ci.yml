@@ -43,6 +43,8 @@ jobs:
         run: npm run package
       - name: 运行集成验收
         run: npm run verify
+      - name: 运行组分析验收
+        run: npm run verify:groups
       - name: 发布新版本
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         shell: bash
