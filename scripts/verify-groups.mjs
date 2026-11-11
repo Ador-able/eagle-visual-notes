@@ -55,8 +55,11 @@ try {
     }, text);
   };
   const shared = async (members, body) => {
-    await until(async () => { const data = await items(); return members.every(id => data[id].annotation === data[members[0]].annotation) && data[members[0]].annotation.startsWith(body) && data[members[0]].annotation.includes('<!-- eagle-note-group:'); }, '全组正文和协议一致');
+    // 保存结束后再独立回读文件，避免 Windows 读句柄与原子替换争用。
+    await until(async () => await page.locator('#save-state').innerText() === '已保存', '组同步完成');
     const data = await items();
+    assert(members.every(id => data[id].annotation === data[members[0]].annotation));
+    assert(data[members[0]].annotation.startsWith(body));
     assert.deepEqual(groupOf(data[members[0]].annotation).items, members);
     for (const id of members) assert.deepEqual(data[id].tags, ['保留标签']);
   };
@@ -142,15 +145,19 @@ try {
   assert.match(await page.locator('#error-text').innerText(), /1 张待清空/);
   assert.deepEqual(groupOf((await items()).A.annotation).removed, ['D']);
   await control('failure', ''); await restart();
-  await until(async () => (await items()).D.annotation === '', '重开恢复清空');
   await shared(['A', 'B', 'C'], '# 中断后的新稿');
+  assert.equal((await items()).D.annotation, '');
   assert(!groupOf((await items()).A.annotation).removed);
   pass('移出清空失败时保留操作，重开剩余成员后继续清空并收尾');
 
   await remove('C');
-  await until(async () => await gallery.count() === 2 && (await items()).C.annotation === '', '移出 C');
+  await shared(['A', 'B'], '# 中断后的新稿');
+  assert.equal(await gallery.count(), 2);
+  assert.equal((await items()).C.annotation, '');
   await remove('B');
-  await until(async () => (await items()).B.annotation === '' && !(await items()).A.annotation.includes('eagle-note-group'), '最后一张恢复单图');
+  await until(async () => await page.locator('#group-members').isHidden() && await page.locator('#save-state').innerText() === '已保存', '最后一张恢复单图');
+  assert.equal((await items()).B.annotation, '');
+  assert(!(await items()).A.annotation.includes('eagle-note-group'));
   assert.match((await items()).A.annotation, /中断后的新稿/);
   assert(await page.locator('#group-members').isHidden());
   pass('主动移出清空完整注释，最后一张去掉协议并保留分析');
@@ -183,6 +190,37 @@ try {
   assert.equal((await items()).M.annotation, '  \n\n');
   assert.equal((await items()).C.annotation, '');
   pass('相同正文直接建组，单图空白原样保留，重复运行不会授权后续多选自动建组');
+
+  const scrollIds = Array.from({ length: 18 }, (_, index) => `S${index + 1}`);
+  const scrollAnnotation = `# 连续观察\n\n滚动到后面继续选图。\n\n<!-- eagle-note-group:${JSON.stringify({ version: 1, id: 'scroll-gallery', items: scrollIds })} -->`;
+  await control('items', Object.fromEntries(scrollIds.map(id => [id, makeItem(id, scrollAnnotation)])));
+  await control('select', ['S1']);
+  await until(async () => await gallery.count() === scrollIds.length, '长缩略图列表');
+  await page.locator('#read-mode').click();
+  const scrollStrip = page.locator('#group-members');
+  const scrollStart = await scrollStrip.evaluate(el => { el.scrollLeft = el.scrollWidth - el.clientWidth; return el.scrollLeft; });
+  assert(scrollStart > 500);
+  const scrollBody = await page.locator('#reading').innerText();
+  // 使用可见缩略图的屏幕坐标点击，避免自动滚动掩盖位置回退。
+  for (const id of ['S18', 'S17', 'S16']) {
+    const thumbnail = page.locator(`[data-item="${id}"]`);
+    const rect = await thumbnail.boundingBox();
+    await page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    await until(async () => await thumbnail.getAttribute('aria-pressed') === 'true', '切换后段缩略图');
+    const scrollAfter = await scrollStrip.evaluate(el => el.scrollLeft);
+    console.log(`缩略图 ${id}：滚动位置 ${scrollStart} → ${scrollAfter}`);
+    assert(Math.abs(scrollAfter - scrollStart) <= 1, '点击缩略图后保持横向滚动位置');
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('data-item')), id);
+  }
+  assert.equal(await page.locator('#reading').innerText(), scrollBody);
+  await page.keyboard.press('Alt+ArrowRight');
+  await until(async () => await page.locator('[data-item="S17"]').getAttribute('aria-pressed') === 'true', '组内快捷键导航');
+  assert(Math.abs(await scrollStrip.evaluate(el => el.scrollLeft) - scrollStart) <= 1);
+  await paste('# 连续观察\n\n保存后仍保持缩略图位置。');
+  await shared(scrollIds, '# 连续观察');
+  await until(async () => (await page.locator('#save-state').innerText()) === '已保存', '长列表编辑保存');
+  assert(Math.abs(await scrollStrip.evaluate(el => el.scrollLeft) - scrollStart) <= 1);
+  pass('长列表后段连续点击、快捷键导航和自动保存均保持横向滚动位置，点击焦点与正文稳定');
 
   await control('select', ['F']);
   await until(async () => await page.locator('[data-item="F"]').count() === 1, '展示两张组');

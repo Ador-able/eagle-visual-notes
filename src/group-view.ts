@@ -5,6 +5,7 @@ import type { NoteDocument } from "./storage";
 export class GroupView {
   private menu = $("group-menu");
   private target = "";
+  private galleryKey = "";
 
   constructor(select: (id: string) => void, remove: (id: string) => void, adopt: (text: string) => void) {
     $("group-members").addEventListener("click", event => {
@@ -43,19 +44,26 @@ export class GroupView {
     this.menu.hidden = true;
     const gallery = $("group-members");
     gallery.hidden = !doc?.group || doc.members.length < 2;
-    gallery.replaceChildren(...(doc?.group ? doc.members : []).map(item => {
-      const button = document.createElement("button");
-      button.dataset.item = item.id;
-      button.title = item.name;
-      button.setAttribute("aria-label", item.name);
-      button.setAttribute("aria-pressed", String(item.id === doc!.item.id));
-      const img = document.createElement("img");
-      img.src = fileURL(item.thumbnailPath || item.filePath);
-      img.alt = "";
-      img.draggable = false;
-      button.append(img);
-      return button;
-    }));
+    const members = doc?.group ? doc.members : [];
+    const key = JSON.stringify([doc?.library, doc?.group?.id, members.map(item => [item.id, item.name, item.thumbnailPath || item.filePath])]);
+    // 成员和缩略图未变化时复用节点，保留滚动位置与键盘焦点。
+    if (key !== this.galleryKey) {
+      this.galleryKey = key;
+      gallery.replaceChildren(...members.map(item => {
+        const button = document.createElement("button");
+        button.dataset.item = item.id;
+        button.title = item.name;
+        button.setAttribute("aria-label", item.name);
+        const img = document.createElement("img");
+        img.src = fileURL(item.thumbnailPath || item.filePath);
+        img.alt = "";
+        img.draggable = false;
+        button.append(img);
+        return button;
+      }));
+    }
+    for (const button of gallery.querySelectorAll<HTMLButtonElement>("button[data-item]"))
+      button.setAttribute("aria-pressed", String(button.dataset.item === doc?.item.id));
     const choices = doc?.choices || [];
     $("group-choice").hidden = !choices.length;
     if (JSON.stringify(choices.map(c => [c.item.id, c.text])) === JSON.stringify(this.choices.map(c => [c.item.id, c.text]))) return;
