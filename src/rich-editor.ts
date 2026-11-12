@@ -16,7 +16,8 @@ import { keymap } from "@milkdown/kit/prose/keymap";
 import { getMarkRange } from "@milkdown/kit/prose";
 import { $prose, callCommand, replaceAll } from "@milkdown/kit/utils";
 import { $ } from "./shared";
-import { resolveNoteImage } from "./note-images";
+import { createNoteImage, type NoteImageContext } from "./note-images";
+import type { Node } from "@milkdown/kit/prose/model";
 import "@milkdown/kit/prose/view/style/prosemirror.css";
 import "@milkdown/kit/prose/gapcursor/style/gapcursor.css";
 
@@ -25,6 +26,7 @@ export class RichNoteEditor {
   private replacing = false;
   private editable = true;
   private text = "";
+  private images?: NoteImageContext;
   private linkDialog = $<HTMLDialogElement>("link-dialog");
 
   constructor(parent: HTMLElement, onChange: (text: string) => void) {
@@ -45,16 +47,7 @@ export class RichNoteEditor {
         ctx.set(editorViewOptionsCtx, {
           editable: () => this.editable,
           attributes: { class: "markdown", "aria-label": "渲染笔记编辑器", spellcheck: "false" },
-          nodeViews: { image: (node) => {
-            const image = document.createElement("img");
-            image.src = node.attrs.src;
-            image.alt = node.attrs.alt;
-            if (node.attrs.title) image.title = node.attrs.title;
-            image.draggable = true;
-            resolveNoteImage(image, node.attrs.src);
-            // 只更新显示地址，文档中始终保留素材 ID。
-            return { dom: image, ignoreMutation: () => true };
-          } },
+          nodeViews: { image: node => this.imageView(node) },
           handleDOMEvents: { click: (_view, event) => {
             if (!(event.target as Element).closest("a")) return false;
             event.preventDefault();
@@ -88,6 +81,17 @@ export class RichNoteEditor {
   }
 
   async create() { await this.editor.create(); }
+  private imageView(node: Node) {
+    const dom = createNoteImage(node.attrs.src, node.attrs.alt || "", node.attrs.title || "", this.images);
+    // 节点视图只控制呈现，文档中始终保留原始引用。
+    return { dom, ignoreMutation: () => true, stopEvent: () => dom instanceof HTMLButtonElement };
+  }
+  setImageContext(images: NoteImageContext) {
+    this.images = images;
+    // 更新视图而不重建文档，保留选区与撤销历史。
+    if (this.editor.status === EditorStatus.Created)
+      this.view.setProps({ nodeViews: { image: node => this.imageView(node) } });
+  }
   get view() { return this.editor.ctx.get(editorViewCtx); }
   get hasFocus() { return this.editor.status === EditorStatus.Created && this.view.hasFocus(); }
   setText(text: string, reset = false) {

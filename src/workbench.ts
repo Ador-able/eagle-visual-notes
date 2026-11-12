@@ -14,6 +14,7 @@ import { MediaView } from "./media-view";
 import { ColorPalette } from "./color-palette";
 import { GroupView } from "./group-view";
 import { parseNote } from "./note-group";
+import type { NoteImageContext } from "./note-images";
 import {
   backupLibrary,
   loadNote,
@@ -30,6 +31,7 @@ interface Settings {
   lineHeight: number;
   split: number;
   mode: NoteMode;
+  showGroupImages: boolean;
   bounds?: Bounds;
   maximized?: boolean;
   fullscreen?: boolean;
@@ -39,6 +41,7 @@ const defaults: Settings = {
   lineHeight: 1.8,
   split: 52,
   mode: "read",
+  showGroupImages: false,
 };
 let settings: Settings = { ...defaults };
 let current: NoteDocument | null = null;
@@ -57,6 +60,7 @@ let disposed = false;
 let editVersion = 0;
 let selectionKey = "";
 let analysisRequested = true;
+let imageContextKey = "";
 function noteChanged(text: string) {
   if (!current || switching) return;
   current.text = text;
@@ -107,7 +111,25 @@ const groupView = new GroupView(
     present(current, "", await mediaView.prepare(current.item));
     await flush();
   }),
+  imageContext,
 );
+
+function imageContext(): NoteImageContext {
+  return {
+    members: current?.group ? current.members : [],
+    showGroupImages: settings.showGroupImages,
+    select: id => void action(() => previewMember(id)),
+  };
+}
+function updateNoteImages() {
+  const images = imageContext();
+  const key = JSON.stringify([current?.library, images.members.map(item => [item.id, item.name]), images.showGroupImages]);
+  if (key === imageContextKey) return;
+  imageContextKey = key;
+  richEditor.setImageContext(images);
+  if (current && settings.mode === "read") renderMarkdown($("reading"), current.text, images);
+  groupView.renderPreview();
+}
 
 function updateMedia(doc: NoteDocument) {
   colorPalette.update(doc.item);
@@ -117,6 +139,7 @@ function updateMedia(doc: NoteDocument) {
   $("media-meta").textContent = `${doc.item.width} × ${doc.item.height}`;
   for (const id of ["fit", "actual", "zoom"]) $(id).hidden = isVideo(doc.item);
   groupView.render(doc);
+  updateNoteImages();
 }
 
 async function previewMember(id: string) {
@@ -157,6 +180,7 @@ function applySettings() {
   );
   $<HTMLInputElement>("font-size").value = String(settings.fontSize);
   $<HTMLInputElement>("line-height").value = String(settings.lineHeight);
+  $<HTMLInputElement>("show-group-images").checked = settings.showGroupImages;
 }
 function updateMode() {
   const available = !!current && !current.choices.length;
@@ -169,7 +193,7 @@ function updateMode() {
     $(`${mode}-mode`).setAttribute("aria-pressed", String(settings.mode === mode));
     $<HTMLButtonElement>(`${mode}-mode`).disabled = !available;
   }
-  if (current && settings.mode === "read") renderMarkdown($("reading"), current.text);
+  if (current && settings.mode === "read") renderMarkdown($("reading"), current.text, imageContext());
   if (current && settings.mode === "source") editor.view.requestMeasure();
 }
 function present(
@@ -179,6 +203,7 @@ function present(
 ) {
   current = doc;
   groupView.render(doc);
+  updateNoteImages();
   colorPalette.update(doc?.item);
   editor.setText(doc?.text || "");
   richEditor.setText(doc?.text || "", true);
@@ -531,6 +556,11 @@ for (const id of ["font-size", "line-height"])
       showError(error);
     }
   });
+$("show-group-images").addEventListener("change", () => {
+  settings.showGroupImages = $<HTMLInputElement>("show-group-images").checked;
+  updateNoteImages();
+  try { persistSettings(); } catch (error) { showError(error); }
+});
 for (const [id, before, after] of [
   ["format-bold", "**", "**"],
   ["format-italic", "*", "*"],

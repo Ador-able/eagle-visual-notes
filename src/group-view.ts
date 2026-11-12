@@ -1,13 +1,15 @@
 import { $, renderMarkdown } from "./shared";
 import { fileURL } from "./files";
 import type { NoteDocument } from "./storage";
+import type { NoteImageContext } from "./note-images";
 
 export class GroupView {
   private menu = $("group-menu");
   private target = "";
   private galleryKey = "";
 
-  constructor(select: (id: string) => void, remove: (id: string) => void, adopt: (text: string) => void) {
+  constructor(select: (id: string) => void, remove: (id: string) => void, adopt: (text: string) => void,
+    private imageContext: () => NoteImageContext) {
     $("group-members").addEventListener("click", event => {
       const button = (event.target as Element).closest<HTMLButtonElement>("button[data-item]");
       if (button) select(button.dataset.item!);
@@ -35,10 +37,16 @@ export class GroupView {
     $("group-source").onchange = () => {
       const index = $<HTMLSelectElement>("group-source").value;
       $<HTMLButtonElement>("group-adopt").disabled = index === "";
-      renderMarkdown($("group-preview"), index === "" ? "" : this.choices[Number(index)].text);
+      this.renderPreview();
     };
   }
   private choices: NoteDocument["choices"] = [];
+
+  renderPreview() {
+    const index = $<HTMLSelectElement>("group-source").value;
+    if (index !== "") renderMarkdown($("group-preview"), this.choices[Number(index)].text, this.imageContext());
+    else $("group-preview").replaceChildren();
+  }
 
   render(doc: NoteDocument | null) {
     this.menu.hidden = true;

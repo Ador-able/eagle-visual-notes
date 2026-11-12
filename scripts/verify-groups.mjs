@@ -222,6 +222,78 @@ try {
   assert(Math.abs(await scrollStrip.evaluate(el => el.scrollLeft) - scrollStart) <= 1);
   pass('长列表后段连续点击、快捷键导航和自动保存均保持横向滚动位置，点击焦点与正文稳定');
 
+  const imageBody = '# 图片引用\n\n对照 ![第一张](eagle-image:R1) 与 ![](eagle-image:R2)。\n\n[![局部细节](eagle-image:R2)](https://example.invalid)\n\n![组外配图](eagle-image:OUT)\n\n![缺失配图](eagle-image:MISSING)\n';
+  const imageAnnotation = `${imageBody}\n<!-- eagle-note-group:${JSON.stringify({ version: 1, id: 'image-references', items: ['R1', 'R2', 'R3'] })} -->`;
+  await control('items', { R1: makeItem('R1', imageAnnotation), R2: makeItem('R2', imageAnnotation), R3: makeItem('R3', imageAnnotation), OUT: makeItem('OUT') });
+  await control('select', ['R1']);
+  await until(async () => await page.locator('[data-item="R1"]').count() === 1, '图片引用组');
+  await page.locator('#read-mode').click();
+  const reading = page.locator('#reading');
+  assert.equal(await reading.locator('.note-image-reference').count(), 3);
+  assert.equal(await reading.locator('.note-image-reference img').count(), 0);
+  assert.equal(await reading.locator('[data-note-image="R2"]').first().innerText(), '素材 R2');
+  await until(async () => reading.locator('img[alt="组外配图"]').evaluate(img => img.naturalWidth > 0), '组外配图解码');
+  await until(async () => await reading.locator('img[alt="图片素材不可用：缺失配图"]').count() === 1, '缺失配图提示');
+  await reading.locator('a .note-image-reference').click();
+  await until(async () => await page.locator('#image').getAttribute('alt') === '素材 R2', '引用切换左侧图片');
+  assert.equal(await page.locator('[data-item="R2"]').getAttribute('aria-pressed'), 'true');
+  assert.equal((await control('state')).lastExternal, undefined);
+  await reading.locator('[data-note-image="R1"]').focus();
+  await page.keyboard.press('Enter');
+  await until(async () => await page.locator('#image').getAttribute('alt') === '素材 R1', '键盘激活引用');
+  assert.equal((await items()).R1.annotation, imageAnnotation);
+  await mkdir('artifacts/verification', { recursive: true });
+  await control('capture', path.resolve('artifacts/verification/group-image-references.png'));
+  pass('组内引用默认显示文字，空说明使用素材名；鼠标和键盘切换左图，不打开外链或改写正文，组外与缺失配图正常处理');
+
+  const showImages = async value => {
+    await page.locator('#more-menu summary').click();
+    await page.locator('#show-group-images').setChecked(value);
+    await page.keyboard.press('Escape');
+  };
+  await showImages(true);
+  await until(async () => reading.locator('.note-image-reference img').evaluateAll(images => images.length === 3 && images.every(img => img.naturalWidth > 0)), '显示组内配图');
+  await reading.locator('[data-note-image="R2"]').first().click();
+  await until(async () => await page.locator('#image').getAttribute('alt') === '素材 R2', '显示图片时点击引用');
+  assert.equal((await items()).R1.annotation, imageAnnotation);
+  await restart();
+  await until(async () => await page.locator('#reading .note-image-reference img').count() === 3, '重开保留显示设置');
+  assert(await page.locator('#show-group-images').isChecked());
+  await control('capture', path.resolve('artifacts/verification/group-image-expanded.png'));
+  pass('显示开关即时生效并跨窗口保留，展开图片仍可切换左图，原始注释保持一致');
+
+  await page.locator('#rich-mode').click();
+  await rich.locator('[data-note-image="R2"]').first().click();
+  await until(async () => await page.locator('#image').getAttribute('alt') === '素材 R2', '渲染编辑中点击引用');
+  await rich.focus(); await page.keyboard.press('Control+End');
+  await page.keyboard.type('撤销标记');
+  await until(async () => await page.locator('#save-state').innerText() === '已保存', '引用正文编辑保存');
+  await showImages(false);
+  assert.equal(await rich.locator('.note-image-reference img').count(), 0);
+  await rich.focus(); await page.keyboard.press('Control+z');
+  await until(async () => !(await rich.innerText()).includes('撤销标记') && await page.locator('#save-state').innerText() === '已保存', '显示切换后撤销');
+  const savedImages = await items();
+  assert.equal(savedImages.R1.annotation, savedImages.R2.annotation);
+  for (const source of ['eagle-image:R1', 'eagle-image:R2', 'eagle-image:OUT', 'eagle-image:MISSING']) assert(savedImages.R1.annotation.includes(source));
+  assert(!savedImages.R1.annotation.includes('file:'));
+  await page.locator('#source-mode').click();
+  assert((await page.locator('#editor').innerText()).includes('eagle-image:R2'));
+  const imageExport = path.join(root, '图片引用.md');
+  await control('dialog', { canceled: false, filePath: imageExport });
+  await page.locator('#more-menu summary').click(); await page.locator('#export-note').click();
+  await until(async () => { try { return (await readFile(imageExport, 'utf8')).includes('eagle-image:R2'); } catch { return false; } }, '导出原始图片引用');
+  pass('渲染编辑中的引用可点击，显示切换保留撤销历史；整组保存、源码和导出均保留素材 ID');
+
+  await page.locator('#read-mode').click();
+  await remove('R2');
+  await until(async () => await page.locator('#reading [data-note-image="R2"]').count() === 0 && await page.locator('#save-state').innerText() === '已保存', '移出后恢复普通配图');
+  await until(async () => page.locator('#reading img[alt="局部细节"]').evaluate(img => img.naturalWidth > 0), '移出成员图片仍可引用');
+  await restart();
+  await until(async () => await gallery.count() === 2 && await page.locator('#reading [data-note-image="R1"]').count() === 1, '重开后保留移出结果');
+  await remove('R3');
+  await until(async () => await page.locator('#group-members').isHidden() && await page.locator('#reading .note-image-reference').count() === 0, '单图笔记不隐藏配图');
+  pass('成员移出后自动恢复普通配图，组解散为单图后不隐藏任何引用');
+
   await control('select', ['F']);
   await until(async () => await page.locator('[data-item="F"]').count() === 1, '展示两张组');
   await page.locator('#read-mode').click();

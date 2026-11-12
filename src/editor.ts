@@ -9,9 +9,23 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirro
 import { markdown } from "@codemirror/lang-markdown";
 import {
   syntaxHighlighting,
-  defaultHighlightStyle,
+  HighlightStyle,
 } from "@codemirror/language";
+import { tags } from "@lezer/highlight";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
+
+// 高亮使用主题变量，切换深浅主题时保留编辑器状态。
+const noteHighlightStyle = HighlightStyle.define([
+  { tag: tags.heading, fontWeight: "600" },
+  { tag: tags.emphasis, fontStyle: "italic" },
+  { tag: tags.strong, fontWeight: "700", color: "var(--strong)" },
+  { tag: tags.strikethrough, textDecoration: "line-through" },
+  { tag: [tags.keyword, tags.name], color: "var(--accent)" },
+  { tag: [tags.link, tags.url], color: "var(--accent)", textDecoration: "underline" },
+  { tag: [tags.literal, tags.atom, tags.monospace, tags.escape, tags.inserted, tags.deleted], color: "var(--strong)" },
+  { tag: [tags.meta, tags.comment, tags.contentSeparator], color: "var(--syntax-muted)" },
+  { tag: tags.invalid, color: "var(--error)" },
+]);
 
 export class NoteEditor {
   view: EditorView;
@@ -24,7 +38,7 @@ export class NoteEditor {
       history(),
       drawSelection(),
       highlightSelectionMatches(),
-      syntaxHighlighting(defaultHighlightStyle),
+      syntaxHighlighting(noteHighlightStyle),
       EditorView.lineWrapping,
       keymap.of([
         { key: "Mod-b", run: () => this.wrap("**") },

@@ -1,5 +1,5 @@
 import MarkdownIt from "markdown-it";
-import { resolveNoteImage } from "./note-images";
+import { createNoteImage, type NoteImageContext } from "./note-images";
 
 const imageExtensions = new Set(
   "jpg jpeg png webp gif bmp avif svg tif tiff heic heif psd ai eps raw cr2 cr3 nef arw dng raf orf rw2 jxl".split(
@@ -20,12 +20,12 @@ export const isMedia = (item: EagleItem) =>
 
 // Markdown 禁用原始 HTML，避免笔记内容在启用 Node 的插件中执行脚本。
 const markdown = new MarkdownIt({ html: false, linkify: true, breaks: true });
-export function renderMarkdown(target: HTMLElement, text: string) {
+export function renderMarkdown(target: HTMLElement, text: string, images?: NoteImageContext) {
   target.innerHTML = text.trim()
     ? markdown.render(text)
     : '<p class="empty-note">还没有分析笔记</p>';
   for (const image of target.querySelectorAll("img"))
-    resolveNoteImage(image, image.getAttribute("src") || "");
+    image.replaceWith(createNoteImage(image.getAttribute("src") || "", image.alt, image.title, images));
 }
 export function bindLinks(
   target: HTMLElement,

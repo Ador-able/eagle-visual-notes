@@ -6,6 +6,7 @@
   --canvas: #e4e5e2;
   --text: #2c2d30;
   --muted: #74777c;
+  --syntax-muted: #66696e;
   --line: #0000000d;
   --hover: #00000009;
   --accent: #416b93;
@@ -25,6 +26,7 @@
   --canvas: #202123;
   --text: #e2e3e5;
   --muted: #a0a2a8;
+  --syntax-muted: #aeb2b9;
   --line: #ffffff0b;
   --hover: #ffffff0c;
   --accent: #b8cde4;
@@ -180,6 +182,9 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round
 .more-menu summary::-webkit-details-marker { display: none; }
 .menu-popover { position: absolute; right: 10px; top: 43px; width: 190px; padding: 6px; z-index: 10; background: var(--toolbar); border: 1px solid var(--line); box-shadow: 0 8px 24px #0003; border-radius: 9px; }
 .menu-popover button { display: block; width: 100%; text-align: left; padding: 9px 10px; }
+.menu-option { display: flex; align-items: center; gap: 8px; padding: 9px 10px; cursor: pointer; }
+.menu-option input { margin: 0; accent-color: var(--accent); }
+.menu-option:hover { background: var(--hover); border-radius: 5px; }
 .menu-popover kbd { float: right; font-size: 11px; color: var(--muted); }
 .menu-popover hr { border: 0; border-top: 1px solid var(--line); margin: 4px; }
 .format-toolbar { display: flex; align-items: center; gap: 2px; padding: 5px 12px; border-bottom: 1px solid var(--line); flex: none; flex-wrap: wrap; }
@@ -220,6 +225,10 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round
 .markdown code { font-family: ui-monospace, Consolas, monospace; background: var(--bg); padding: 2px 4px; border-radius: 3px; font-size: .9em; }
 .markdown pre code { padding: 0; background: none; }
 .markdown img { max-width: 100%; height: auto; border-radius: 3px; }
+.markdown .note-image-reference { display: inline; min-height: 0; max-width: 100%; padding: 0; border: 0; border-radius: 2px; background: none; font: inherit; color: var(--accent); text-align: inherit; text-decoration: underline; text-underline-offset: 3px; white-space: normal; overflow-wrap: anywhere; }
+.markdown .note-image-reference:hover { color: var(--strong); }
+.markdown .note-image-expanded { display: inline-block; vertical-align: middle; text-decoration: none; }
+.note-image-expanded img { display: block; }
 .markdown table { border-collapse: collapse; display: block; overflow: auto; width: 100%; font-size: .9em; }
 .markdown th, .markdown td { padding: 8px 12px; border: 1px solid var(--line); }
 .empty-note { color: var(--muted); }
