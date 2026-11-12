@@ -59,7 +59,8 @@ let lastGeometry = 0;
 let disposed = false;
 let editVersion = 0;
 let selectionKey = "";
-let analysisRequested = true;
+let analysisRequest = 1;
+let consumedAnalysisRequest = 0;
 let imageContextKey = "";
 function noteChanged(text: string) {
   if (!current || switching) return;
@@ -264,6 +265,7 @@ async function syncSelection() {
   if (!ready || actionBusy || saveBlocked) return;
   if (syncPromise) return syncPromise;
   syncPromise = (async () => {
+    const request = analysisRequest;
     const library = eagle.library.path;
     const version = editVersion;
     const wasSaving = !!savePromise;
@@ -276,8 +278,9 @@ async function syncSelection() {
     if (!sameSelection) await flush();
     const valid = selected.length > 0 && selected.every(isMedia);
     const unlinkedSelection = valid && selected.length > 1 && selected.every(item => !parseNote(item.annotation || "", item.id).group);
-    const requested = analysisRequested;
-    analysisRequested = false;
+    // 每轮只消费开始时已有的请求，等待期间到达的请求留给下一轮。
+    const requested = request !== consumedAnalysisRequest;
+    consumedAnalysisRequest = request;
     const openGroup = !unlinkedSelection || requested || sameSelection && !!current?.group;
     const doc = valid && openGroup ? await loadNote(library, selected) : null;
     if (library !== eagle.library.path || version !== editVersion || savePromise) return;
@@ -296,7 +299,6 @@ async function syncSelection() {
       const latest = await eagle.item.getSelected();
       if (library !== eagle.library.path || key !== JSON.stringify([library, latest.map(item => item.id)])) return;
       selectionKey = key;
-      analysisRequested = false;
       present(doc, unlinkedSelection && !openGroup ? `已选择 ${selected.length} 张素材，请在 Eagle 中点击分析` : selected.length ? "请选择图片或视频素材" : "在 Eagle 中选择图片或视频", commitMedia);
       if (doc && !doc.choices.length) await flush();
       clearError();
@@ -691,7 +693,7 @@ eagle.onPluginCreate(() => {
   });
 });
 eagle.onPluginRun(() => {
-  analysisRequested = true;
+  analysisRequest++;
   void showWindow().catch(showError);
 });
 eagle.onPluginShow(() => {

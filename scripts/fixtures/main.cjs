@@ -17,6 +17,7 @@ const manifest = JSON.parse(fs.readFileSync(path.resolve('dist/manifest.json'), 
 let failure = '';
 let readFailure = '';
 let delay = 0;
+let selectionPause;
 let reloaded;
 const dialogs = [];
 const persist = () => writeFileAtomic.sync(path.join(root, 'state.json'), JSON.stringify(state, null, 2));
@@ -29,7 +30,12 @@ ipcMain.handle('fixture-call', async (event, method, args) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (method === 'selected') {
     if (delay) await new Promise(resolve => setTimeout(resolve, delay));
-    return state.selected.map(id => state.libraries[state.library][id]).filter(Boolean);
+    const selected = state.selected.map(id => state.libraries[state.library][id]).filter(Boolean);
+    if (selectionPause && selectionPause.skip-- === 0) {
+      selectionPause.waiting = true;
+      await new Promise(resolve => { selectionPause.resume = resolve; });
+    }
+    return selected;
   }
   if (method === 'get') {
     if (readFailure) throw new Error(readFailure);
@@ -90,6 +96,10 @@ app.whenReady().then(() => {
     failure(value) { failure = value; },
     readFailure(value) { readFailure = value; },
     delay(value) { delay = value; },
+    // 固定选择读取的返回时序，复现分析请求与轮询交错。
+    pauseSelection(skip) { selectionPause = { skip, waiting: false }; },
+    selectionPaused() { return !!selectionPause?.waiting; },
+    resumeSelection() { const pause = selectionPause; selectionPause = undefined; pause?.resume?.(); },
     dialog(value) { dialogs.push(value); },
     theme(value) { state.theme = value; send('snapshot', snapshot()); send('theme', value); },
     // 工作台恢复窗口尺寸并显示后，才继续验收后续交互。

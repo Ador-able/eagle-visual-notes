@@ -171,10 +171,19 @@ try {
   await page.locator('#group-source').selectOption('1');
   await page.locator('#group-adopt').click();
   await shared(['F', 'G'], '# G 的内容');
-  await control('select', ['H', 'I']); await control('run');
+  await page.evaluate(() => {
+    window.analysisRunObserved = false;
+    eagle.onPluginRun(() => { window.analysisRunObserved = true; });
+  });
+  // 将分析操作插入选择同步的等待阶段，核对请求不会被旧一轮清掉。
+  await app.evaluate(() => { global.fixture.pauseSelection(1); global.fixture.select(['H', 'I']); });
+  await until(() => control('selectionPaused'), '选择同步等待返回');
+  await control('run');
+  await page.waitForFunction(() => window.analysisRunObserved);
+  await control('resumeSelection');
   await shared(['H', 'I'], '\n\n<!--');
   assert(await page.locator('#group-choice').isHidden());
-  pass('仅多选不会改写注释，点击分析处理不同正文；全空组直接建立');
+  pass('仅多选不会改写注释，点击分析处理不同正文；选择同步期间点击分析仍能建立全空组');
 
   await control('items', { J: makeItem('J', '# 相同正文'), K: makeItem('K', '# 相同正文'), M: makeItem('M', '  \n\n') });
   await control('select', ['M']);
@@ -312,4 +321,4 @@ try {
   console.error(error);
   if (page) console.error(await page.locator('body').innerText().catch(() => '窗口不可读取'));
   throw error;
-} finally { await control('shutdown'); await app.close(); }
+} finally { await control('resumeSelection'); await control('shutdown'); await app.close(); }
